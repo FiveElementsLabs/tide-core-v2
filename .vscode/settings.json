@@ -8,7 +8,8 @@
   "solidity.formatter": "forge",
   "solidity.compileUsingRemoteVersion": "v0.8.21",
   "solidity.solhintRules": {
-    "func-name-mixedcase": false,
-    "var-name-mixedcase": false
+    "func-name-mixedCase": "off",
+    "var-name-mixedCase": "off",
+    "private-vars-leading-underscore": "off"
   }
 }
