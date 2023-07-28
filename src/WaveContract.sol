@@ -2,12 +2,12 @@
 pragma solidity ^0.8.21;
 pragma abicoder v2;
 
-import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
-import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
-import {ERC2771Context, Context} from "@openzeppelin/contracts/metatx/ERC2771Context.sol";
+import {Strings} from "lib/openzeppelin-contracts/contracts/utils/Strings.sol";
+import {Ownable} from "lib/openzeppelin-contracts/contracts/access/Ownable.sol";
+import {ERC2771Context, Context} from "lib/openzeppelin-contracts/contracts/metatx/ERC2771Context.sol";
 import {IWaveFactory} from "./interfaces/IWaveFactory.sol";
-import {ERC721} from "@openzeppelin/contracts/token/ERC721/ERC721.sol";
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {ERC721} from "lib/openzeppelin-contracts/contracts/token/ERC721/ERC721.sol";
+import {IERC20} from "lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 
 contract WaveContract is ERC2771Context, Ownable, ERC721 {
     IWaveFactory public factory;
@@ -16,7 +16,7 @@ contract WaveContract is ERC2771Context, Ownable, ERC721 {
     uint256 public startTimestamp;
     uint256 public endTimestamp;
 
-    string _baseURI;
+    string _metadataBaseURI;
     bool public customMetadata;
     bool public isSoulbound;
     bytes32 public immutable DOMAIN_SEPARATOR;
@@ -24,7 +24,7 @@ contract WaveContract is ERC2771Context, Ownable, ERC721 {
 
     mapping(bytes32 => bool) _claimed;
     mapping(uint256 => uint256) public tokenIdToRewardId;
-    TokenReward[] public tokenRewards;
+    IWaveFactory.TokenReward[] public tokenRewards;
 
     struct ClaimParams {
         uint256 rewardId;
@@ -80,39 +80,38 @@ contract WaveContract is ERC2771Context, Ownable, ERC721 {
     constructor(
         string memory _name,
         string memory _symbol,
-        string memory _URI,
+        string memory _uri,
         uint256 _startTimestamp,
         uint256 _endTimestamp,
         bool _isSoulbound,
         address _trustedForwarder,
-        TokenReward[] memory _tokenRewards
+        IWaveFactory.TokenReward[] memory _tokenRewards
     ) ERC2771Context(_trustedForwarder) Ownable() ERC721(_name, _symbol) {
         if (_startTimestamp > _endTimestamp || _endTimestamp < block.timestamp)
             revert InvalidTimings();
 
         factory = IWaveFactory(_msgSender());
-        _baseURI = _URI;
+        _metadataBaseURI = _uri;
         startTimestamp = _startTimestamp;
         endTimestamp = _endTimestamp;
         isSoulbound = _isSoulbound;
-        tokenRewards = _tokenRewards;
-        
-        _depositRewardsTokens();
 
         DOMAIN_SEPARATOR = _computeDomainSeparator();
         PERMIT_TYPEHASH = keccak256(
             "Permit(address spender,uint256 rewardId,uint256 deadline)"
         );
+        
+        _initiateRewards(_tokenRewards);
     }
 
     /// @notice Allows the governance to set metadata base URI for all tokens
-    /// @param _URI The base URI to set
+    /// @param _uri The base URI to set
     /// @param _customMetadata Whether the metadata is encoded with rewardId or tokenId
     function changeBaseURI(
-        string memory _URI,
+        string memory _uri,
         bool _customMetadata
     ) public onlyGovernance {
-        _baseURI = _URI;
+        _metadataBaseURI = _uri;
         customMetadata = _customMetadata;
     }
 
@@ -129,7 +128,7 @@ contract WaveContract is ERC2771Context, Ownable, ERC721 {
         uint8 len = uint8(tokenRewards.length);
 
         for (uint8 i = 0; i < len; ++i) {
-            TokenReward memory tokenReward = tokenRewards[i];
+            IWaveFactory.TokenReward memory tokenReward = tokenRewards[i];
             IERC20 token = IERC20(tokenReward.token);
             uint256 balance = token.balanceOf(address(this));
 
@@ -197,7 +196,7 @@ contract WaveContract is ERC2771Context, Ownable, ERC721 {
             customMetadata
                 ? string(
                     abi.encodePacked(
-                        _baseURI,
+                        _metadataBaseURI,
                         "/",
                         Strings.toString(tokenId),
                         ".json"
@@ -205,7 +204,7 @@ contract WaveContract is ERC2771Context, Ownable, ERC721 {
                 )
                 : string(
                     abi.encodePacked(
-                        _baseURI,
+                        _metadataBaseURI,
                         "/",
                         Strings.toString(tokenIdToRewardId[tokenId]),
                         ".json"
@@ -213,15 +212,17 @@ contract WaveContract is ERC2771Context, Ownable, ERC721 {
                 );
     }
 
-    function _depositRewardsTokens() internal {
-        uint8 len = uint8(tokenRewards.length);
+    function _initiateRewards(IWaveFactory.TokenReward[] memory _tokenRewards) internal {
+        uint8 len = uint8(_tokenRewards.length);
 
         if (len >= 2 ** 8) {
             revert TooManyRewards();
         }
             
         for (uint8 i = 0; i < len; ++i) {
-            TokenReward memory tokenReward = tokenRewards[i];
+            IWaveFactory.TokenReward memory tokenReward = _tokenRewards[i];
+            tokenRewards[i] = tokenReward;
+
             IERC20(tokenReward.token).transferFrom(
                 _msgSender(),
                 address(this),
