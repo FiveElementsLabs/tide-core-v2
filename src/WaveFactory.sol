@@ -5,6 +5,7 @@ pragma abicoder v2;
 import {Ownable} from "lib/openzeppelin-contracts/contracts/access/Ownable.sol";
 import {WaveContract} from "./WaveContract.sol";
 import {IWaveFactory} from "./interfaces/IWaveFactory.sol";
+import {IERC20} from "lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 
 contract WaveFactory is Ownable, IWaveFactory {
     address[] public waves;
@@ -12,13 +13,11 @@ contract WaveFactory is Ownable, IWaveFactory {
     address public trustedForwarder;
     address public verifier;
 
+    error TooManyRewards();
+
     event WaveCreated(address indexed wave, address indexed owner);
 
-    constructor(
-        address _keeper,
-        address _trustedForwarder,
-        address _verifier
-    ) Ownable() {
+    constructor(address _keeper, address _trustedForwarder, address _verifier) Ownable() {
         keeper = _keeper;
         trustedForwarder = _trustedForwarder;
         verifier = _verifier;
@@ -32,10 +31,7 @@ contract WaveFactory is Ownable, IWaveFactory {
 
     /// @dev changes the trusted forwarder for EIP-2771 meta transactions
     /// @param _trustedForwarder address of the new trusted forwarder
-    function changeTrustedForwarder(address _trustedForwarder)
-        public
-        onlyOwner
-    {
+    function changeTrustedForwarder(address _trustedForwarder) public onlyOwner {
         trustedForwarder = _trustedForwarder;
     }
 
@@ -75,6 +71,21 @@ contract WaveFactory is Ownable, IWaveFactory {
         waves.push(address(wave));
         wave.transferOwnership(msg.sender);
 
+        _initiateRewards(_tokenRewards, address(wave));
+
         emit WaveCreated(address(wave), msg.sender);
+    }
+
+    function _initiateRewards(IWaveFactory.TokenReward[] memory _tokenRewards, address wave) internal {
+        uint8 len = uint8(_tokenRewards.length);
+
+        if (len >= 2 ** 8) {
+            revert TooManyRewards();
+        }
+
+        for (uint8 i = 0; i < len; ++i) {
+            IWaveFactory.TokenReward memory tokenReward = _tokenRewards[i];
+            IERC20(tokenReward.token).transferFrom(msg.sender, wave, tokenReward.amount);
+        }
     }
 }
