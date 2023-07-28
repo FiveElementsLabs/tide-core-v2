@@ -2,10 +2,10 @@
 pragma solidity ^0.8.21;
 pragma abicoder v2;
 
-import {Ownable} from "lib/openzeppelin-contracts/contracts/access/Ownable.sol";
+import {Ownable} from "../lib/openzeppelin-contracts/contracts/access/Ownable.sol";
 import {WaveContract} from "./WaveContract.sol";
 import {IWaveFactory} from "./interfaces/IWaveFactory.sol";
-import {IERC20} from "lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
+import {IERC20} from "../lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 
 contract WaveFactory is Ownable, IWaveFactory {
     address[] public waves;
@@ -48,6 +48,7 @@ contract WaveFactory is Ownable, IWaveFactory {
     /// @param _startTimestamp start timestamp of the campaign
     /// @param _endTimestamp end timestamp of the campaign
     /// @param _isSoulbound whether the wave badges will be soulbound
+    /// @param _tokenRewards array of token rewards
     function deployWave(
         string memory _name,
         string memory _symbol,
@@ -55,7 +56,7 @@ contract WaveFactory is Ownable, IWaveFactory {
         uint256 _startTimestamp,
         uint256 _endTimestamp,
         bool _isSoulbound,
-        IWaveFactory.TokenReward[] memory _tokenRewards
+        IWaveFactory.TokenRewards[] memory _tokenRewards
     ) public override {
         WaveContract wave = new WaveContract(
             _name,
@@ -79,7 +80,7 @@ contract WaveFactory is Ownable, IWaveFactory {
     /// @notice funds the campaign with the specified token rewards
     /// @param _tokenRewards array of token rewards
     /// @param wave address of the campaign
-    function _initiateRewards(IWaveFactory.TokenReward[] memory _tokenRewards, address wave) internal {
+    function _initiateRewards(IWaveFactory.TokenRewards[] memory _tokenRewards, address wave) internal {
         uint8 len = uint8(_tokenRewards.length);
 
         if (len >= 2 ** 8) {
@@ -87,8 +88,9 @@ contract WaveFactory is Ownable, IWaveFactory {
         }
 
         for (uint8 i = 0; i < len; ++i) {
-            IWaveFactory.TokenReward memory tokenReward = _tokenRewards[i];
-            IERC20(tokenReward.token).transferFrom(msg.sender, wave, tokenReward.amount);
+            IERC20(_tokenRewards[i].token).transferFrom(
+                msg.sender, wave, _tokenRewards[i].amountPerUser * _tokenRewards[i].rewardsLeft
+            );
         }
     }
 }

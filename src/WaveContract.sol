@@ -2,12 +2,12 @@
 pragma solidity ^0.8.21;
 pragma abicoder v2;
 
-import {Strings} from "lib/openzeppelin-contracts/contracts/utils/Strings.sol";
-import {Ownable} from "lib/openzeppelin-contracts/contracts/access/Ownable.sol";
-import {ERC2771Context, Context} from "lib/openzeppelin-contracts/contracts/metatx/ERC2771Context.sol";
+import {Strings} from "../lib/openzeppelin-contracts/contracts/utils/Strings.sol";
+import {Ownable} from "../lib/openzeppelin-contracts/contracts/access/Ownable.sol";
+import {ERC2771Context, Context} from "../lib/openzeppelin-contracts/contracts/metatx/ERC2771Context.sol";
 import {IWaveFactory} from "./interfaces/IWaveFactory.sol";
-import {ERC721} from "lib/openzeppelin-contracts/contracts/token/ERC721/ERC721.sol";
-import {IERC20} from "lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
+import {ERC721} from "../lib/openzeppelin-contracts/contracts/token/ERC721/ERC721.sol";
+import {IERC20} from "../lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import {SignatureVerifier} from "./helpers/SignatureVerifier.sol";
 
 contract WaveContract is ERC2771Context, Ownable, ERC721, SignatureVerifier {
@@ -23,18 +23,12 @@ contract WaveContract is ERC2771Context, Ownable, ERC721, SignatureVerifier {
 
     mapping(bytes32 => bool) _claimed;
     mapping(uint256 => uint256) public tokenIdToRewardId;
-    IWaveFactory.TokenReward[] public tokenRewards;
+    IWaveFactory.TokenRewards[] public tokenRewards;
+    uint8 public immutable rewardsLength;
 
     struct ClaimParams {
         uint256 rewardId;
         address user;
-    }
-
-    struct TokenReward {
-        uint256 count;
-        uint256 amount;
-        address token;
-        bool isRaffle;
     }
 
     error OnlyGovernance();
@@ -70,7 +64,7 @@ contract WaveContract is ERC2771Context, Ownable, ERC721, SignatureVerifier {
         uint256 _endTimestamp,
         bool _isSoulbound,
         address _trustedForwarder,
-        IWaveFactory.TokenReward[] memory _tokenRewards
+        IWaveFactory.TokenRewards[] memory _tokenRewards
     ) ERC2771Context(_trustedForwarder) Ownable() ERC721(_name, _symbol) SignatureVerifier(_name) {
         if (_startTimestamp > _endTimestamp || _endTimestamp < block.timestamp) {
             revert InvalidTimings();
@@ -82,8 +76,8 @@ contract WaveContract is ERC2771Context, Ownable, ERC721, SignatureVerifier {
         endTimestamp = _endTimestamp;
         isSoulbound = _isSoulbound;
 
-        uint8 len = uint8(_tokenRewards.length);
-        for (uint8 i = 0; i < len; ++i) {
+        rewardsLength = uint8(_tokenRewards.length);
+        for (uint8 i = 0; i < rewardsLength; ++i) {
             tokenRewards.push(_tokenRewards[i]);
         }
     }
@@ -109,10 +103,8 @@ contract WaveContract is ERC2771Context, Ownable, ERC721, SignatureVerifier {
         //check that all rewards have been awarded
         //otherwise, revert
 
-        uint8 len = uint8(tokenRewards.length);
-
-        for (uint8 i = 0; i < len; ++i) {
-            IWaveFactory.TokenReward memory tokenReward = tokenRewards[i];
+        for (uint8 i = 0; i < rewardsLength; ++i) {
+            IWaveFactory.TokenRewards memory tokenReward = tokenRewards[i];
             IERC20 token = IERC20(tokenReward.token);
             uint256 balance = token.balanceOf(address(this));
 
@@ -138,6 +130,8 @@ contract WaveContract is ERC2771Context, Ownable, ERC721, SignatureVerifier {
         _verifySignature(_msgSender(), rewardId, deadline, v, r, s, factory.verifier());
 
         _mintReward(_msgSender(), rewardId);
+
+        _emitERC20Rewards(_msgSender());
     }
 
     /// @notice returns the URI for a given token ID
@@ -179,5 +173,17 @@ contract WaveContract is ERC2771Context, Ownable, ERC721, SignatureVerifier {
     ///@return address sender
     function _msgSender() internal view override(ERC2771Context, Context) returns (address) {
         return ERC2771Context._msgSender();
+    }
+
+    /// @dev internal function to emit the first FCFS ERC20 reward available
+    /// @param claimer The address to emit the rewards to
+    function _emitERC20Rewards(address claimer) internal {
+        for (uint8 i = 0; i < rewardsLength; i++) {
+            if (!tokenRewards[i].isRaffle && tokenRewards[i].rewardsLeft != 0) {
+                IERC20(tokenRewards[i].token).transfer(claimer, tokenRewards[i].amountPerUser);
+                tokenRewards[i].rewardsLeft--;
+                break;
+            }
+        }
     }
 }
