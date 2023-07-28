@@ -2,7 +2,7 @@
 pragma solidity ^0.8.21;
 pragma abicoder v2;
 
-import {IERC721} from "lib/openzeppelin-contracts/contracts/token/ERC721/IERC721.sol";
+import {IERC721} from "../../lib/openzeppelin-contracts/contracts/token/ERC721/IERC721.sol";
 
 contract SignatureVerifier {
     struct Permit {
