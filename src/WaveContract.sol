@@ -110,12 +110,15 @@ contract WaveContract is ERC2771Context, Ownable, ERC721 {
         customMetadata = _customMetadata;
     }
 
+    /// @notice Allows the owner to end the campaign early
+    /// and withdraw remaining funds
     function endCampaign() public onlyOwner onlyActive {
         endTimestamp = block.timestamp;
         // call raffle function
         withdrawRemainingFunds();
     }
 
+    /// @notice Allows the owner to withdraw remaining funds after the campaign has ended
     function withdrawRemainingFunds() public onlyOwner onlyEnded {
         //check that all rewards have been awarded
         //otherwise, revert

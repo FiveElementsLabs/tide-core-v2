@@ -76,6 +76,9 @@ contract WaveFactory is Ownable, IWaveFactory {
         emit WaveCreated(address(wave), msg.sender);
     }
 
+    /// @notice funds the campaign with the specified token rewards
+    /// @param _tokenRewards array of token rewards
+    /// @param wave address of the campaign
     function _initiateRewards(IWaveFactory.TokenReward[] memory _tokenRewards, address wave) internal {
         uint8 len = uint8(_tokenRewards.length);
 
