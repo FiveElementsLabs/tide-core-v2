@@ -1,3 +1,4 @@
 {
-    "solidity.defaultCompiler": "remote"
+  "solidity.defaultCompiler": "remote",
+  "solidity.packageDefaultDependenciesDirectory": "lib"
 }

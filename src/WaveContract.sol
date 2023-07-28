@@ -7,6 +7,7 @@ import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {ERC2771Context, Context} from "@openzeppelin/contracts/metatx/ERC2771Context.sol";
 import {IWaveFactory} from "./interfaces/IWaveFactory.sol";
 import {ERC721} from "@openzeppelin/contracts/token/ERC721/ERC721.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 contract WaveContract is ERC2771Context, Ownable, ERC721 {
     IWaveFactory public factory;
@@ -15,14 +16,15 @@ contract WaveContract is ERC2771Context, Ownable, ERC721 {
     uint256 public startTimestamp;
     uint256 public endTimestamp;
 
-    string baseURI;
+    string _baseURI;
     bool public customMetadata;
     bool public isSoulbound;
     bytes32 public immutable DOMAIN_SEPARATOR;
     bytes32 public immutable PERMIT_TYPEHASH;
 
-    mapping(bytes32 => bool) claimed;
+    mapping(bytes32 => bool) _claimed;
     mapping(uint256 => uint256) public tokenIdToRewardId;
+    TokenReward[] public tokenRewards;
 
     struct ClaimParams {
         uint256 rewardId;
@@ -35,11 +37,19 @@ contract WaveContract is ERC2771Context, Ownable, ERC721 {
         uint256 deadline;
     }
 
+    struct TokenReward {
+        uint256 count;
+        uint256 amount;
+        address token;
+        bool isRaffle;
+    }
+
     error OnlyGovernance();
-    error OnlyAuthorized();
     error InvalidTimings();
     error InvalidSignature();
     error CampaignNotActive();
+    error CampaignNotEnded();
+    error TooManyRewards();
     error RewardAlreadyClaimed();
     error PermitDeadlineExpired();
     error NotTransferrable();
@@ -55,30 +65,39 @@ contract WaveContract is ERC2771Context, Ownable, ERC721 {
         _;
     }
 
-    modifier onlyAuthorized() {
+    modifier onlyActive() {
         if (
-            _msgSender() != factory.keeper() &&
-            _msgSender() != owner()
-        ) revert OnlyAuthorized();
+            block.timestamp < startTimestamp || block.timestamp > endTimestamp
+        ) revert CampaignNotActive();
+        _;
+    }
+
+    modifier onlyEnded() {
+        if (block.timestamp < endTimestamp) revert CampaignNotEnded();
         _;
     }
 
     constructor(
         string memory _name,
         string memory _symbol,
-        string memory _baseURI,
+        string memory _URI,
         uint256 _startTimestamp,
         uint256 _endTimestamp,
         bool _isSoulbound,
-        address _trustedForwarder
+        address _trustedForwarder,
+        TokenReward[] memory _tokenRewards
     ) ERC2771Context(_trustedForwarder) Ownable() ERC721(_name, _symbol) {
-        if (_startTimestamp > _endTimestamp) revert InvalidTimings();
+        if (_startTimestamp > _endTimestamp || _endTimestamp < block.timestamp)
+            revert InvalidTimings();
 
         factory = IWaveFactory(_msgSender());
-        baseURI = _baseURI;
+        _baseURI = _URI;
         startTimestamp = _startTimestamp;
         endTimestamp = _endTimestamp;
         isSoulbound = _isSoulbound;
+        tokenRewards = _tokenRewards;
+        
+        _depositRewardsTokens();
 
         DOMAIN_SEPARATOR = _computeDomainSeparator();
         PERMIT_TYPEHASH = keccak256(
@@ -87,26 +106,37 @@ contract WaveContract is ERC2771Context, Ownable, ERC721 {
     }
 
     /// @notice Allows the governance to set metadata base URI for all tokens
-    /// @param _baseURI The base URI to set
+    /// @param _URI The base URI to set
     /// @param _customMetadata Whether the metadata is encoded with rewardId or tokenId
-    function changeBaseURI(string memory _baseURI, bool _customMetadata)
-        public
-        onlyGovernance
-    {
-        baseURI = _baseURI;
+    function changeBaseURI(
+        string memory _URI,
+        bool _customMetadata
+    ) public onlyGovernance {
+        _baseURI = _URI;
         customMetadata = _customMetadata;
     }
 
-    /// @notice Allows the owner to set the timings for the campaign
-    /// @param _startTimestamp The timestamp from which users can claim
-    /// @param _endTimestamp The timestamp until which users can claim
-    function changeTimings(uint256 _startTimestamp, uint256 _endTimestamp)
-        public
-        onlyAuthorized
-    {
-        if (_startTimestamp > _endTimestamp) revert InvalidTimings();
-        startTimestamp = _startTimestamp;
-        endTimestamp = _endTimestamp;
+    function endCampaign() public onlyOwner onlyActive {
+        endTimestamp = block.timestamp;
+        // call raffle function
+        withdrawRemainingFunds();
+    }
+
+    function withdrawRemainingFunds() public onlyOwner onlyEnded {
+        //check that all rewards have been awarded
+        //otherwise, revert
+        
+        uint8 len = uint8(tokenRewards.length);
+
+        for (uint8 i = 0; i < len; ++i) {
+            TokenReward memory tokenReward = tokenRewards[i];
+            IERC20 token = IERC20(tokenReward.token);
+            uint256 balance = token.balanceOf(address(this));
+
+            if (balance != 0) {
+                token.transferFrom(address(this), owner(), balance);
+            }
+        }
     }
 
     /// @notice Execute the mint with permit by verifying the off-chain verifier signature.
@@ -122,12 +152,10 @@ contract WaveContract is ERC2771Context, Ownable, ERC721 {
         uint8 v,
         bytes32 r,
         bytes32 s
-    ) public virtual {
-        if (claimed[keccak256(abi.encode(_msgSender(), rewardId))])
+    ) public virtual onlyActive {
+        if (_claimed[keccak256(abi.encode(_msgSender(), rewardId))])
             revert RewardAlreadyClaimed();
         if (block.timestamp > deadline) revert PermitDeadlineExpired();
-        if (block.timestamp < startTimestamp || block.timestamp > endTimestamp)
-            revert CampaignNotActive();
 
         bytes32 typedDataHash = getTypedDataHash(
             Permit(_msgSender(), rewardId, deadline)
@@ -145,11 +173,9 @@ contract WaveContract is ERC2771Context, Ownable, ERC721 {
     /// @dev computes the hash of the fully encoded EIP-712 message for the domain, which can be used to recover the signer
     /// @param _permit The permit struct
     /// @return bytes32 The hash of the fully encoded EIP-712 message for the domain
-    function getTypedDataHash(Permit memory _permit)
-        public
-        view
-        returns (bytes32)
-    {
+    function getTypedDataHash(
+        Permit memory _permit
+    ) public view returns (bytes32) {
         return
             keccak256(
                 abi.encodePacked(
@@ -160,37 +186,18 @@ contract WaveContract is ERC2771Context, Ownable, ERC721 {
             );
     }
 
-    /// @notice mints multiple rewards for multiple users
-    /// @param params The array of ClaimParams
-    function airdrop(ClaimParams[] memory params) public onlyAuthorized {
-        uint256 len = params.length;
-        for (uint256 i = 0; i < len; ++i) {
-            _safeMint(params[i].user, ++lastId);
-
-            tokenIdToRewardId[lastId] = params[i].rewardId;
-            claimed[
-                keccak256(abi.encode(params[i].user, params[i].rewardId))
-            ] = true;
-
-            emit Claimed(params[i].user, lastId, params[i].rewardId);
-        }
-    }
-
     /// @notice returns the URI for a given token ID
     /// @param tokenId The token ID to get the URI for
     /// @return string The URI for the given token ID
-    function tokenURI(uint256 tokenId)
-        public
-        view
-        override
-        returns (string memory)
-    {
+    function tokenURI(
+        uint256 tokenId
+    ) public view override returns (string memory) {
         _requireMinted(tokenId);
         return
             customMetadata
                 ? string(
                     abi.encodePacked(
-                        baseURI,
+                        _baseURI,
                         "/",
                         Strings.toString(tokenId),
                         ".json"
@@ -198,12 +205,29 @@ contract WaveContract is ERC2771Context, Ownable, ERC721 {
                 )
                 : string(
                     abi.encodePacked(
-                        baseURI,
+                        _baseURI,
                         "/",
                         Strings.toString(tokenIdToRewardId[tokenId]),
                         ".json"
                     )
                 );
+    }
+
+    function _depositRewardsTokens() internal {
+        uint8 len = uint8(tokenRewards.length);
+
+        if (len >= 2 ** 8) {
+            revert TooManyRewards();
+        }
+            
+        for (uint8 i = 0; i < len; ++i) {
+            TokenReward memory tokenReward = tokenRewards[i];
+            IERC20(tokenReward.token).transferFrom(
+                _msgSender(),
+                address(this),
+                tokenReward.amount
+            );
+        }
     }
 
     /// @dev override the transfer function to allow transfers only if not soulbound
@@ -225,7 +249,7 @@ contract WaveContract is ERC2771Context, Ownable, ERC721 {
     function _mintReward(address user, uint256 rewardId) internal {
         _safeMint(user, ++lastId);
         tokenIdToRewardId[lastId] = rewardId;
-        claimed[keccak256(abi.encode(user, rewardId))] = true;
+        _claimed[keccak256(abi.encode(user, rewardId))] = true;
         emit Claimed(user, lastId, rewardId);
     }
 
@@ -271,11 +295,9 @@ contract WaveContract is ERC2771Context, Ownable, ERC721 {
     /// @dev computes the hash of a permit struct
     /// @param _permit The permit struct
     /// @return bytes32 The hash of the permit struct
-    function _getStructHash(Permit memory _permit)
-        internal
-        view
-        returns (bytes32)
-    {
+    function _getStructHash(
+        Permit memory _permit
+    ) internal view returns (bytes32) {
         return
             keccak256(
                 abi.encode(
