@@ -35,13 +35,13 @@ contract WaveTest is Test, Helpers {
     function setUp() public {
         _factory = new WaveFactory(address(this), address(0), verifier);
         DAI = new MockedERC20("DAI", "DAI");
-        DAI.mint(address(this), 1 ether);
+        DAI.mint(address(this), 1000000000000000000000000000);
     }
 
     function test_WithoutErc20Rewards() public {
         IWaveFactory.TokenRewards[] memory tokenRewards;
         _factory.deployWave(
-            "test", "T", "https://test.com", block.timestamp, block.timestamp + CAMPAIGN_DURATION, false, tokenRewards
+            "test", "T", "https://test.com", block.timestamp, block.timestamp + 100, false, tokenRewards
         );
         _wave = WaveContract(_factory.waves(0));
     }
@@ -52,7 +52,7 @@ contract WaveTest is Test, Helpers {
         DAI.approve(address(_factory), 1 ether);
 
         _factory.deployWave(
-            "test", "T", "https://test.com", block.timestamp, block.timestamp + CAMPAIGN_DURATION, false, tokenRewards
+            "test", "T", "https://test.com", block.timestamp, block.timestamp + 100, false, tokenRewards
         );
         _wave = WaveContract(_factory.waves(0));
         assertEq(DAI.balanceOf(address(_wave)), REWARDS_COUNT * REWARD_AMOUNT_PER_USER);
