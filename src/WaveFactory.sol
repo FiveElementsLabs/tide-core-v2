@@ -57,6 +57,10 @@ contract WaveFactory is Ownable, IWaveFactory {
         bool _isSoulbound,
         IWaveFactory.TokenReward[] memory _tokenRewards
     ) public override {
+        if (_tokenRewards.length >= 2 ** 8) {
+            revert TooManyRewards();
+        }
+
         WaveContract wave = new WaveContract(
             _name,
             _symbol,
@@ -81,10 +85,6 @@ contract WaveFactory is Ownable, IWaveFactory {
     /// @param wave address of the campaign
     function _initiateRewards(IWaveFactory.TokenReward[] memory _tokenRewards, address wave) internal {
         uint8 len = uint8(_tokenRewards.length);
-
-        if (len >= 2 ** 8) {
-            revert TooManyRewards();
-        }
 
         for (uint8 i = 0; i < len; ++i) {
             IWaveFactory.TokenReward memory tokenReward = _tokenRewards[i];
