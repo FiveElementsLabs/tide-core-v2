@@ -7,7 +7,7 @@
   },
   "solidity.formatter": "forge",
   "solidity.compileUsingRemoteVersion": "v0.8.21",
-  "solidity.linter": "solhint",
+  "solidity.linter": "",
   "solidity.solhintRules": {
     "func-name-mixedCase": "off",
     "var-name-mixedCase": "off",

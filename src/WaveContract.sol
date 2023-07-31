@@ -39,7 +39,11 @@ contract WaveContract is ERC2771Context, Ownable, ERC721, SignatureVerifier {
     error PermitDeadlineExpired();
     error NotTransferrable();
 
-    event Claimed(address indexed user, uint256 indexed tokenId, uint256 rewardId);
+    event Claimed(
+        address indexed user,
+        uint256 indexed tokenId,
+        uint256 rewardId
+    );
 
     modifier onlyGovernance() {
         if (_msgSender() != factory.keeper()) revert OnlyGovernance();
@@ -47,7 +51,8 @@ contract WaveContract is ERC2771Context, Ownable, ERC721, SignatureVerifier {
     }
 
     modifier onlyActive() {
-        if (block.timestamp < startTimestamp || block.timestamp > endTimestamp) revert CampaignNotActive();
+        if (block.timestamp < startTimestamp || block.timestamp > endTimestamp)
+            revert CampaignNotActive();
         _;
     }
 
@@ -65,8 +70,15 @@ contract WaveContract is ERC2771Context, Ownable, ERC721, SignatureVerifier {
         bool _isSoulbound,
         address _trustedForwarder,
         IWaveFactory.TokenRewards[] memory _tokenRewards
-    ) ERC2771Context(_trustedForwarder) Ownable() ERC721(_name, _symbol) SignatureVerifier(_name) {
-        if (_startTimestamp > _endTimestamp || _endTimestamp < block.timestamp) {
+    )
+        ERC2771Context(_trustedForwarder)
+        Ownable()
+        ERC721(_name, _symbol)
+        SignatureVerifier(_name)
+    {
+        if (
+            _startTimestamp > _endTimestamp || _endTimestamp < block.timestamp
+        ) {
             revert InvalidTimings();
         }
 
@@ -85,7 +97,10 @@ contract WaveContract is ERC2771Context, Ownable, ERC721, SignatureVerifier {
     /// @notice Allows the governance to set metadata base URI for all tokens
     /// @param _uri The base URI to set
     /// @param _customMetadata Whether the metadata is encoded with rewardId or tokenId
-    function changeBaseURI(string memory _uri, bool _customMetadata) public onlyGovernance {
+    function changeBaseURI(
+        string memory _uri,
+        bool _customMetadata
+    ) public onlyGovernance {
         _metadataBaseURI = _uri;
         customMetadata = _customMetadata;
     }
@@ -121,13 +136,27 @@ contract WaveContract is ERC2771Context, Ownable, ERC721, SignatureVerifier {
     /// @param v The v component of the signature
     /// @param r The r component of the signature
     /// @param s The s component of the signature
-    function claim(uint256 rewardId, uint256 deadline, uint8 v, bytes32 r, bytes32 s) public virtual onlyActive {
+    function claim(
+        uint256 rewardId,
+        uint256 deadline,
+        uint8 v,
+        bytes32 r,
+        bytes32 s
+    ) public virtual onlyActive {
         if (_claimed[keccak256(abi.encode(_msgSender(), rewardId))]) {
             revert RewardAlreadyClaimed();
         }
         if (block.timestamp > deadline) revert PermitDeadlineExpired();
 
-        _verifySignature(_msgSender(), rewardId, deadline, v, r, s, factory.verifier());
+        _verifySignature(
+            _msgSender(),
+            rewardId,
+            deadline,
+            v,
+            r,
+            s,
+            factory.verifier()
+        );
 
         _mintReward(_msgSender(), rewardId);
 
@@ -137,18 +166,39 @@ contract WaveContract is ERC2771Context, Ownable, ERC721, SignatureVerifier {
     /// @notice returns the URI for a given token ID
     /// @param tokenId The token ID to get the URI for
     /// @return string The URI for the given token ID
-    function tokenURI(uint256 tokenId) public view override returns (string memory) {
+    function tokenURI(
+        uint256 tokenId
+    ) public view override returns (string memory) {
         _requireMinted(tokenId);
-        return customMetadata
-            ? string(abi.encodePacked(_metadataBaseURI, "/", Strings.toString(tokenId), ".json"))
-            : string(abi.encodePacked(_metadataBaseURI, "/", Strings.toString(tokenIdToRewardId[tokenId]), ".json"));
+        return
+            customMetadata
+                ? string(
+                    abi.encodePacked(
+                        _metadataBaseURI,
+                        "/",
+                        Strings.toString(tokenId),
+                        ".json"
+                    )
+                )
+                : string(
+                    abi.encodePacked(
+                        _metadataBaseURI,
+                        "/",
+                        Strings.toString(tokenIdToRewardId[tokenId]),
+                        ".json"
+                    )
+                );
     }
 
     /// @dev override the transfer function to allow transfers only if not soulbound
     /// @param from The address to transfer from
     /// @param to The address to transfer to
     /// @param tokenId The token ID to transfer
-    function _transfer(address from, address to, uint256 tokenId) internal override {
+    function _transfer(
+        address from,
+        address to,
+        uint256 tokenId
+    ) internal override {
         if (isSoulbound) revert NotTransferrable();
         super._transfer(from, to, tokenId);
     }
@@ -165,13 +215,23 @@ contract WaveContract is ERC2771Context, Ownable, ERC721, SignatureVerifier {
 
     ///@dev use ERC2771Context to get msg data
     ///@return bytes calldata
-    function _msgData() internal view override(ERC2771Context, Context) returns (bytes calldata) {
+    function _msgData()
+        internal
+        view
+        override(ERC2771Context, Context)
+        returns (bytes calldata)
+    {
         return ERC2771Context._msgData();
     }
 
     ///@dev use ERC2771Context to get msg sender
     ///@return address sender
-    function _msgSender() internal view override(ERC2771Context, Context) returns (address) {
+    function _msgSender()
+        internal
+        view
+        override(ERC2771Context, Context)
+        returns (address)
+    {
         return ERC2771Context._msgSender();
     }
 
@@ -180,7 +240,10 @@ contract WaveContract is ERC2771Context, Ownable, ERC721, SignatureVerifier {
     function _emitERC20Rewards(address claimer) internal {
         for (uint8 i = 0; i < rewardsLength; i++) {
             if (!tokenRewards[i].isRaffle && tokenRewards[i].rewardsLeft != 0) {
-                IERC20(tokenRewards[i].token).transfer(claimer, tokenRewards[i].amountPerUser);
+                IERC20(tokenRewards[i].token).transfer(
+                    claimer,
+                    tokenRewards[i].amountPerUser
+                );
                 tokenRewards[i].rewardsLeft--;
                 break;
             }
