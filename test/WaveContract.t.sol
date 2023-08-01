@@ -3,7 +3,7 @@ pragma solidity ^0.8.21;
 pragma abicoder v2;
 
 import "../lib/forge-std/src/Test.sol";
-import "../lib/forge-std/src/console2.sol";
+import "../lib/forge-std/src/console.sol";
 import "../lib/forge-std/src/StdUtils.sol";
 import "../src/WaveContract.sol";
 import "../src/WaveFactory.sol";
@@ -33,9 +33,9 @@ contract WaveTest is Test, Helpers {
     error RewardAlreadyClaimed();
 
     function setUp() public {
-        _factory = new WaveFactory(address(this), address(0), address(this), address(0));
+        _factory = new WaveFactory(address(this), address(0), verifier, address(0));
         DAI = new MockedERC20("DAI", "DAI");
-        DAI.mint(address(this), 1000000000000000000000000000);
+        DAI.mint(address(this), 1 ether);
     }
 
     function test_WithoutErc20Rewards() public {
@@ -101,8 +101,7 @@ contract WaveTest is Test, Helpers {
         uint256 deadline = _wave.endTimestamp();
         bytes32 digest = _wave.getTypedDataHash(SignatureVerifier.Permit(user, REWARD_ID, deadline));
 
-        (uint8 v, bytes32 r, bytes32 s) =
-            vm.sign(VERIFIER_PRIVATE_KEY, keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n32", digest)));
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(VERIFIER_PRIVATE_KEY, _prefixed(digest));
 
         vm.prank(user);
         if (errorMessage != bytes4(0)) {
