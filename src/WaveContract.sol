@@ -6,11 +6,12 @@ import {Strings} from "../lib/openzeppelin-contracts/contracts/utils/Strings.sol
 import {Ownable} from "../lib/openzeppelin-contracts/contracts/access/Ownable.sol";
 import {ERC2771Context, Context} from "../lib/openzeppelin-contracts/contracts/metatx/ERC2771Context.sol";
 import {IWaveFactory} from "./interfaces/IWaveFactory.sol";
-import {ERC721} from "../lib/openzeppelin-contracts/contracts/token/ERC721/ERC721.sol";
-import {IERC20} from "../lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
+import {IWaveContract} from "./interfaces/IWaveContract.sol";
+import {ERC721} from "lib/openzeppelin-contracts/contracts/token/ERC721/ERC721.sol";
+import {IERC20} from "lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import {SignatureVerifier} from "./helpers/SignatureVerifier.sol";
 
-contract WaveContract is ERC2771Context, Ownable, ERC721, SignatureVerifier {
+contract WaveContract is ERC2771Context, Ownable, ERC721, SignatureVerifier, IWaveContract {
     IWaveFactory public factory;
 
     uint256 public lastId;
@@ -23,8 +24,12 @@ contract WaveContract is ERC2771Context, Ownable, ERC721, SignatureVerifier {
 
     mapping(bytes32 => bool) _claimed;
     mapping(uint256 => uint256) public tokenIdToRewardId;
+    mapping(bytes32 => bool) public tokenIdToHasWon;
+
     IWaveFactory.TokenRewards[] public tokenRewards;
     uint8 public immutable rewardsLength;
+    bool public raffleStarted;
+    bool public raffleEnded;
 
     struct ClaimParams {
         uint256 rewardId;
@@ -32,6 +37,7 @@ contract WaveContract is ERC2771Context, Ownable, ERC721, SignatureVerifier {
     }
 
     error OnlyGovernance();
+    error OnlyRaffleManager();
     error InvalidTimings();
     error CampaignNotActive();
     error CampaignNotEnded();
@@ -43,6 +49,11 @@ contract WaveContract is ERC2771Context, Ownable, ERC721, SignatureVerifier {
 
     modifier onlyGovernance() {
         if (_msgSender() != factory.keeper()) revert OnlyGovernance();
+        _;
+    }
+
+    modifier onlyRaffleManager() {
+        if (_msgSender() != factory.raffleManager()) revert OnlyRaffleManager();
         _;
     }
 
@@ -94,18 +105,17 @@ contract WaveContract is ERC2771Context, Ownable, ERC721, SignatureVerifier {
 
     /// @notice Allows the owner to end the campaign early
     /// and withdraw remaining funds
-    function endCampaign() public onlyActive {
+    function endCampaign() public onlyActive onlyOwner {
         endTimestamp = block.timestamp;
-        // call raffle function
         withdrawRemainingFunds();
     }
 
     /// @notice Allows the owner to withdraw remaining funds after the campaign has ended
     function withdrawRemainingFunds() public onlyOwner onlyEnded {
-        //check that all rewards have been awarded
-        //otherwise, revert
-
         for (uint8 i = 0; i < rewardsLength; ++i) {
+            if (tokenRewards[i].isRaffle) {
+                require(raffleEnded, "Raffle not done yet");
+            }
             IWaveFactory.TokenRewards memory tokenReward = tokenRewards[i];
             IERC20 token = IERC20(tokenReward.token);
             uint256 balance = token.balanceOf(address(this));
@@ -130,10 +140,30 @@ contract WaveContract is ERC2771Context, Ownable, ERC721, SignatureVerifier {
         if (block.timestamp > deadline) revert PermitDeadlineExpired();
 
         _verifySignature(_msgSender(), rewardId, deadline, v, r, s, factory.verifier());
-
         _mintReward(_msgSender(), rewardId);
 
         _emitERC20Rewards(_msgSender());
+    }
+
+    function startRaffle() public onlyEnded {
+        require(!raffleEnded && !raffleStarted, "Raffle already done");
+        raffleStarted = true;
+        address raffleManager = factory.raffleManager();
+        uint256 amountToRequest = 0;
+        for (uint8 i = 0; i < rewardsLength; ++i) {
+            if (tokenRewards[i].isRaffle) {
+                amountToRequest += tokenRewards[i].rewardsLeft;
+            }
+        }
+        IRaffleManager(raffleManager).makeRequestUint256Array(amountToRequest);
+    }
+
+    function fulfillRaffle(bytes32 _requestId, uint256[] memory randomNumbers) public onlyEnded onlyRaffleManager {
+        require(raffleStarted, "Raffle not started");
+        uint256 prizesAwarded = 0;
+        // TODO: to implement
+        raffleStarted = false;
+        raffleEnded = true;
     }
 
     /// @notice returns the URI for a given token ID

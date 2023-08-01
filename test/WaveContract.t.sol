@@ -33,7 +33,7 @@ contract WaveTest is Test, Helpers {
     error RewardAlreadyClaimed();
 
     function setUp() public {
-        _factory = new WaveFactory(address(this), address(0), verifier);
+        _factory = new WaveFactory(address(this), address(0), address(this), address(0));
         DAI = new MockedERC20("DAI", "DAI");
         DAI.mint(address(this), 1000000000000000000000000000);
     }

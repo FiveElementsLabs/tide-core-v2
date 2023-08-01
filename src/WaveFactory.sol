@@ -12,15 +12,17 @@ contract WaveFactory is Ownable, IWaveFactory {
     address public keeper;
     address public trustedForwarder;
     address public verifier;
+    address public raffleManager;
 
     error TooManyRewards();
 
     event WaveCreated(address indexed wave, address indexed owner);
 
-    constructor(address _keeper, address _trustedForwarder, address _verifier) Ownable() {
+    constructor(address _keeper, address _trustedForwarder, address _verifier, address _raffleManager) Ownable() {
         keeper = _keeper;
         trustedForwarder = _trustedForwarder;
         verifier = _verifier;
+        raffleManager = _raffleManager;
     }
 
     /// @dev changes the keeper associated with the factory
@@ -39,6 +41,12 @@ contract WaveFactory is Ownable, IWaveFactory {
     /// @param _verifier address of the new verifier
     function changeVerifier(address _verifier) public onlyOwner {
         verifier = _verifier;
+    }
+
+    /// @dev changes the raffle manager for the factory
+    /// @param _raffleManager address of the new raffle manager
+    function changeRaffleManager(address _raffleManager) public onlyOwner {
+        raffleManager = _raffleManager;
     }
 
     /// @notice deploys a new campaign

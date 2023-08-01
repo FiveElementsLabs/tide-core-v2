@@ -3,6 +3,7 @@ pragma solidity 0.8.21;
 
 import "../lib/airnode-protocol/contracts/rrp/requesters/RrpRequesterV0.sol";
 import {IWaveFactory} from "./interfaces/IWaveFactory.sol";
+import {IWaveContract} from "./interfaces/IWaveContract.sol";
 
 contract RaffleManager is RrpRequesterV0 {
     event RequestedUint256Array(bytes32 indexed requestId, uint256 size);
@@ -13,14 +14,14 @@ contract RaffleManager is RrpRequesterV0 {
     // Since it is impossible to ensure that a particular Airnode will be
     // indefinitely available, you are recommended to always implement a way
     // to update these parameters.
-    address public airnode = 0x6238772544f029ecaBfDED4300f13A3c4FE84E1D;
-    bytes32 public endpointIdUint256Array = 0x27cc2713e7f968e4e86ed274a051a5c8aaee9cca66946f23af6f29ecea9704c3;
+    address public airnode;
+    bytes32 public endpointIdUint256Array;
     address public sponsorWallet;
-    uint256[] public qrngUint256Array;
 
     IWaveFactory public waveFactory;
 
     mapping(bytes32 => bool) public expectingRequestWithIdToBeFulfilled;
+    mapping(bytes32 => address) public requestToRequester;
 
     modifier onlyGovernance() {
         require(msg.sender == waveFactory.keeper(), "Only governance can call this function.");
@@ -50,8 +51,8 @@ contract RaffleManager is RrpRequesterV0 {
 
     /// @notice Requests a `uint256[]`
     /// @param size Size of the requested array
-    function makeRequestUint256Array(uint256 size) external {
-        bytes32 requestId = airnodeRrp.makeFullRequest(
+    function makeRequestUint256Array(uint256 size) external returns (bytes32 requestId) {
+        requestId = airnodeRrp.makeFullRequest(
             airnode,
             endpointIdUint256Array,
             address(this),
@@ -62,6 +63,7 @@ contract RaffleManager is RrpRequesterV0 {
             abi.encode(bytes32("1u"), bytes32("size"), size)
         );
         expectingRequestWithIdToBeFulfilled[requestId] = true;
+        requestToRequester[requestId] = msg.sender;
         emit RequestedUint256Array(requestId, size);
     }
 
@@ -73,12 +75,8 @@ contract RaffleManager is RrpRequesterV0 {
         require(expectingRequestWithIdToBeFulfilled[requestId], "Request ID not known");
         expectingRequestWithIdToBeFulfilled[requestId] = false;
         uint256[] memory _qrngUint256Array = abi.decode(data, (uint256[]));
-        // Do what you want with `qrngUint256Array` here...
-        qrngUint256Array = _qrngUint256Array;
-        emit ReceivedUint256Array(requestId, qrngUint256Array);
-    }
 
-    function getRandomNumberArray() public view returns (uint256[] memory) {
-        return qrngUint256Array;
+        IWaveContract(requestToRequester[requestId]).fulfillRaffle(requestId, _qrngUint256Array);
+        emit ReceivedUint256Array(requestId, _qrngUint256Array);
     }
 }

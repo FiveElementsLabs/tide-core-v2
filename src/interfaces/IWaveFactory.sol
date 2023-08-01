@@ -23,4 +23,6 @@ interface IWaveFactory {
     function keeper() external view returns (address);
 
     function verifier() external view returns (address);
+
+    function raffleManager() external view returns (address);
 }
