@@ -9,11 +9,6 @@ contract RaffleManager is RrpRequesterV0 {
     event RequestedUint256Array(bytes32 indexed requestId, uint256 size);
     event ReceivedUint256Array(bytes32 indexed requestId, uint256[] response);
 
-    // These variables can also be declared as `constant`/`immutable`.
-    // However, this would mean that they would not be updatable.
-    // Since it is impossible to ensure that a particular Airnode will be
-    // indefinitely available, you are recommended to always implement a way
-    // to update these parameters.
     address public airnode;
     bytes32 public endpointIdUint256Array;
     address public sponsorWallet;
@@ -59,7 +54,7 @@ contract RaffleManager is RrpRequesterV0 {
             sponsorWallet,
             address(this),
             this.fulfillUint256Array.selector,
-            // Using Airnode ABI to encode the parameters
+            // @dev Using Airnode ABI to encode the parameters
             abi.encode(bytes32("1u"), bytes32("size"), size)
         );
         expectingRequestWithIdToBeFulfilled[requestId] = true;
@@ -76,7 +71,7 @@ contract RaffleManager is RrpRequesterV0 {
         expectingRequestWithIdToBeFulfilled[requestId] = false;
         uint256[] memory _qrngUint256Array = abi.decode(data, (uint256[]));
 
-        IWaveContract(requestToRequester[requestId]).fulfillRaffle(requestId, _qrngUint256Array);
+        IWaveContract(requestToRequester[requestId]).fulfillRaffle(_qrngUint256Array);
         emit ReceivedUint256Array(requestId, _qrngUint256Array);
     }
 }

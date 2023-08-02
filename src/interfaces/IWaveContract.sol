@@ -23,7 +23,6 @@ interface IWaveContract {
     function withdrawRemainingFunds() external;
 
     /// @notice Execute the mint with permit by verifying the off-chain verifier signature
-    /// @dev Also works with gasless EIP-2612 forwarders
     /// @param rewardId The rewardId to mint
     /// @param deadline The deadline for the permit
     /// @param v The v component of the signature
@@ -33,5 +32,5 @@ interface IWaveContract {
 
     function startRaffle() external;
 
-    function fulfillRaffle(bytes32 _requestId, uint256[] memory randomNumbers) external;
+    function fulfillRaffle(uint256[] memory randomNumbers) external;
 }
