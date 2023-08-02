@@ -2,14 +2,6 @@
 pragma solidity ^0.8.21;
 pragma abicoder v2;
 
-import {Strings} from "lib/openzeppelin-contracts/contracts/utils/Strings.sol";
-import {Ownable} from "lib/openzeppelin-contracts/contracts/access/Ownable.sol";
-import {ERC2771Context, Context} from "lib/openzeppelin-contracts/contracts/metatx/ERC2771Context.sol";
-import {IWaveFactory} from "./IWaveFactory.sol";
-import {ERC721} from "lib/openzeppelin-contracts/contracts/token/ERC721/ERC721.sol";
-import {IERC20} from "lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
-import {SignatureVerifier} from "../helpers/SignatureVerifier.sol";
-
 interface IWaveContract {
     struct TokenReward {
         uint256 count;
@@ -41,10 +33,5 @@ interface IWaveContract {
 
     function startRaffle() external;
 
-    function fulfillRaffle() external;
-
-    /// @notice returns the URI for a given token ID
-    /// @param tokenId The token ID to get the URI for
-    /// @return string The URI for the given token ID
-    function tokenURI(uint256 tokenId) external view returns (string memory);
+    function fulfillRaffle(bytes32 _requestId, uint256[] memory randomNumbers) external;
 }

@@ -7,7 +7,6 @@ interface IWaveFactory {
         uint256 rewardsLeft;
         uint256 amountPerUser;
         address token;
-        bool isRaffle;
     }
 
     function deployWave(
@@ -17,7 +16,8 @@ interface IWaveFactory {
         uint256 _startTimestamp,
         uint256 _endTimestamp,
         bool _isSoulbound,
-        TokenRewards[] memory _tokenRewards
+        TokenRewards[] memory _claimRewards,
+        TokenRewards[] memory _raffleRewards
     ) external;
 
     function keeper() external view returns (address);

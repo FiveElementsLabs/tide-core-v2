@@ -56,7 +56,8 @@ contract WaveFactory is Ownable, IWaveFactory {
     /// @param _startTimestamp start timestamp of the campaign
     /// @param _endTimestamp end timestamp of the campaign
     /// @param _isSoulbound whether the wave badges will be soulbound
-    /// @param _tokenRewards array of token rewards
+    /// @param _claimRewards array of claim rewards
+    /// @param _raffleRewards array of raffle rewards
     function deployWave(
         string memory _name,
         string memory _symbol,
@@ -64,9 +65,10 @@ contract WaveFactory is Ownable, IWaveFactory {
         uint256 _startTimestamp,
         uint256 _endTimestamp,
         bool _isSoulbound,
-        IWaveFactory.TokenRewards[] memory _tokenRewards
+        IWaveFactory.TokenRewards[] memory _claimRewards,
+        IWaveFactory.TokenRewards[] memory _raffleRewards
     ) public override {
-        if (_tokenRewards.length >= 2 ** 8) {
+        if (_claimRewards.length >= 2 ** 8 || _raffleRewards.length >= 2 ** 8) {
             revert TooManyRewards();
         }
 
@@ -78,13 +80,15 @@ contract WaveFactory is Ownable, IWaveFactory {
             _endTimestamp,
             _isSoulbound,
             trustedForwarder,
-            _tokenRewards
+            _claimRewards,
+            _raffleRewards
         );
 
         waves.push(address(wave));
         wave.transferOwnership(msg.sender);
 
-        _initiateRewards(_tokenRewards, address(wave));
+        _initiateRewards(_claimRewards, address(wave));
+        _initiateRewards(_raffleRewards, address(wave));
 
         emit WaveCreated(address(wave), msg.sender);
     }

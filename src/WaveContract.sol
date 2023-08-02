@@ -7,6 +7,7 @@ import {Ownable} from "../lib/openzeppelin-contracts/contracts/access/Ownable.so
 import {ERC2771Context, Context} from "../lib/openzeppelin-contracts/contracts/metatx/ERC2771Context.sol";
 import {IWaveFactory} from "./interfaces/IWaveFactory.sol";
 import {IWaveContract} from "./interfaces/IWaveContract.sol";
+import {IRaffleManager} from "./interfaces/IRaffleManager.sol";
 import {ERC721} from "lib/openzeppelin-contracts/contracts/token/ERC721/ERC721.sol";
 import {IERC20} from "lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import {SignatureVerifier} from "./helpers/SignatureVerifier.sol";
@@ -24,12 +25,13 @@ contract WaveContract is ERC2771Context, Ownable, ERC721, SignatureVerifier, IWa
 
     mapping(bytes32 => bool) _claimed;
     mapping(uint256 => uint256) public tokenIdToRewardId;
-    mapping(bytes32 => bool) public tokenIdToHasWon;
+    mapping(bytes32 => bool) public tokenIdRewardIdxHashToHasWon;
 
-    IWaveFactory.TokenRewards[] public tokenRewards;
-    uint8 public immutable rewardsLength;
+    IWaveFactory.TokenRewards[] public claimRewards;
+    IWaveFactory.TokenRewards[] public raffleRewards;
+    uint8 public immutable claimRewardsLength;
+    uint8 public immutable raffleRewardsLength;
     bool public raffleStarted;
-    bool public raffleEnded;
 
     struct ClaimParams {
         uint256 rewardId;
@@ -77,7 +79,8 @@ contract WaveContract is ERC2771Context, Ownable, ERC721, SignatureVerifier, IWa
         uint256 _endTimestamp,
         bool _isSoulbound,
         address _trustedForwarder,
-        IWaveFactory.TokenRewards[] memory _tokenRewards
+        IWaveFactory.TokenRewards[] memory _claimRewards,
+        IWaveFactory.TokenRewards[] memory _raffleRewards
     ) ERC2771Context(_trustedForwarder) Ownable() ERC721(_name, _symbol) SignatureVerifier(_name) {
         if (_startTimestamp > _endTimestamp || _endTimestamp < block.timestamp) {
             revert InvalidTimings();
@@ -89,9 +92,14 @@ contract WaveContract is ERC2771Context, Ownable, ERC721, SignatureVerifier, IWa
         endTimestamp = _endTimestamp;
         isSoulbound = _isSoulbound;
 
-        rewardsLength = uint8(_tokenRewards.length);
-        for (uint8 i = 0; i < rewardsLength; ++i) {
-            tokenRewards.push(_tokenRewards[i]);
+        claimRewardsLength = uint8(_claimRewards.length);
+        for (uint8 i = 0; i < claimRewardsLength; ++i) {
+            claimRewards.push(_claimRewards[i]);
+        }
+
+        raffleRewardsLength = uint8(_raffleRewards.length);
+        for (uint8 i = 0; i < raffleRewardsLength; ++i) {
+            raffleRewards.push(_raffleRewards[i]);
         }
     }
 
@@ -112,17 +120,13 @@ contract WaveContract is ERC2771Context, Ownable, ERC721, SignatureVerifier, IWa
 
     /// @notice Allows the owner to withdraw remaining funds after the campaign has ended
     function withdrawRemainingFunds() public onlyOwner onlyEnded {
-        for (uint8 i = 0; i < rewardsLength; ++i) {
-            if (tokenRewards[i].isRaffle) {
-                require(raffleEnded, "Raffle not done yet");
-            }
-            IWaveFactory.TokenRewards memory tokenReward = tokenRewards[i];
-            IERC20 token = IERC20(tokenReward.token);
-            uint256 balance = token.balanceOf(address(this));
+        for (uint8 i = 0; i < raffleRewardsLength; ++i) {
+            require(raffleStarted, "Raffle not done yet");
+            _returnTokenToOwner(IERC20(raffleRewards[i].token));
+        }
 
-            if (balance != 0) {
-                token.transfer(owner(), balance);
-            }
+        for (uint8 i = 0; i < claimRewardsLength; ++i) {
+            _returnTokenToOwner(IERC20(claimRewards[i].token));
         }
     }
 
@@ -146,24 +150,30 @@ contract WaveContract is ERC2771Context, Ownable, ERC721, SignatureVerifier, IWa
     }
 
     function startRaffle() public onlyEnded {
-        require(!raffleEnded && !raffleStarted, "Raffle already done");
+        require(!raffleStarted, "Raffle already done");
         raffleStarted = true;
         address raffleManager = factory.raffleManager();
-        uint256 amountToRequest = 0;
-        for (uint8 i = 0; i < rewardsLength; ++i) {
-            if (tokenRewards[i].isRaffle) {
-                amountToRequest += tokenRewards[i].rewardsLeft;
-            }
-        }
-        IRaffleManager(raffleManager).makeRequestUint256Array(amountToRequest);
+        IRaffleManager(raffleManager).makeRequestUint256Array(raffleRewardsLength);
     }
 
-    function fulfillRaffle(bytes32 _requestId, uint256[] memory randomNumbers) public onlyEnded onlyRaffleManager {
-        require(raffleStarted, "Raffle not started");
-        uint256 prizesAwarded = 0;
-        // TODO: to implement
-        raffleStarted = false;
-        raffleEnded = true;
+    function fulfillRaffle(bytes32, uint256[] memory randomNumbers) public onlyEnded onlyRaffleManager {
+        for (uint8 i = 0; i < raffleRewardsLength; i++) {
+            uint256 randomNumber = randomNumbers[i];
+            IERC20 token = IERC20(raffleRewards[i].token);
+
+            uint256 counter = 0;
+            uint256 rewardsLeft = raffleRewards[i].rewardsLeft;
+            for (uint256 assigned = 0; assigned < rewardsLeft; assigned++) {
+                uint256 tokenId;
+                do {
+                    tokenId = uint256(keccak256(abi.encodePacked(randomNumber, counter, block.timestamp))) % lastId + 1;
+                    counter++;
+                } while (tokenIdRewardIdxHashToHasWon[keccak256(abi.encodePacked(tokenId, i))]);
+
+                tokenIdRewardIdxHashToHasWon[keccak256(abi.encodePacked(tokenId, i))] = true;
+                token.transfer(ownerOf(tokenId), raffleRewards[i].amountPerUser);
+            }
+        }
     }
 
     /// @notice returns the URI for a given token ID
@@ -210,16 +220,23 @@ contract WaveContract is ERC2771Context, Ownable, ERC721, SignatureVerifier, IWa
     /// @dev internal function to emit the first FCFS ERC20 reward available
     /// @param claimer The address to emit the rewards to
     function _emitERC20Rewards(address claimer) internal {
-        for (uint8 i = 0; i < rewardsLength; i++) {
-            IERC20 token = IERC20(tokenRewards[i].token);
-            uint256 amountPerUser = tokenRewards[i].amountPerUser;
+        for (uint8 i = 0; i < claimRewardsLength; i++) {
+            IERC20 token = IERC20(claimRewards[i].token);
+            uint256 amountPerUser = claimRewards[i].amountPerUser;
             bool enoughBalance = amountPerUser <= token.balanceOf(address(this));
 
-            if (!tokenRewards[i].isRaffle && tokenRewards[i].rewardsLeft != 0 && enoughBalance) {
+            if (claimRewards[i].rewardsLeft != 0 && enoughBalance) {
                 token.transfer(claimer, amountPerUser);
-                tokenRewards[i].rewardsLeft--;
+                claimRewards[i].rewardsLeft--;
                 break;
             }
+        }
+    }
+
+    function _returnTokenToOwner(IERC20 token) internal {
+        uint256 balance = token.balanceOf(address(this));
+        if (balance != 0) {
+            token.transfer(owner(), balance);
         }
     }
 }
