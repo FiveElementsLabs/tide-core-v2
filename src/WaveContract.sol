@@ -42,8 +42,12 @@ contract WaveContract is ERC2771Context, Ownable, ERC721, SignatureVerifier, IWa
     error NotTransferrable();
 
     event Claimed(address indexed user, uint256 indexed tokenId);
-    event fcfsAwarded(address indexed user, address indexed token, uint256 amount);
+    event FCFSAwarded(address indexed user, address indexed token, uint256 amount);
     event RaffleWon(address indexed user, address indexed token, uint256 amount);
+    event RaffleStarted(address indexed user);
+    event RaffleCompleted();
+    event CampaignForceEnded();
+    event FundsWithdrawn();
 
     modifier onlyGovernance() {
         if (_msgSender() != factory.keeper()) revert OnlyGovernance();
@@ -112,6 +116,7 @@ contract WaveContract is ERC2771Context, Ownable, ERC721, SignatureVerifier, IWa
     function endCampaign() public onlyActive onlyOwner {
         endTimestamp = block.timestamp;
         withdrawRemainingFunds();
+        emit CampaignForceEnded();
     }
 
     /// @notice Allows the owner to withdraw remaining funds after the campaign has ended
@@ -124,6 +129,8 @@ contract WaveContract is ERC2771Context, Ownable, ERC721, SignatureVerifier, IWa
         for (uint8 i = 0; i < claimRewardsLength; ++i) {
             _returnTokenToOwner(IERC20(claimRewards[i].token));
         }
+
+        emit FundsWithdrawn();
     }
 
     /// @notice Execute the mint with permit by verifying the off-chain verifier signature
@@ -148,6 +155,7 @@ contract WaveContract is ERC2771Context, Ownable, ERC721, SignatureVerifier, IWa
     function startRaffle() public onlyEnded {
         require(!raffleStarted, "Raffle already done");
         raffleStarted = true;
+        emit RaffleStarted(_msgSender());
         address raffleManager = factory.raffleManager();
         IRaffleManager(raffleManager).makeRequestUint256Array(raffleRewardsLength);
     }
@@ -179,6 +187,7 @@ contract WaveContract is ERC2771Context, Ownable, ERC721, SignatureVerifier, IWa
                 emit RaffleWon(winner, tokenAddress, amountPerUser);
             }
         }
+        emit RaffleCompleted();
     }
 
     /// @notice returns the URI for a given token ID
@@ -230,7 +239,7 @@ contract WaveContract is ERC2771Context, Ownable, ERC721, SignatureVerifier, IWa
 
             if (claimRewards[i].rewardsLeft != 0 && enoughBalance) {
                 token.transfer(claimer, amountPerUser);
-                emit fcfsAwarded(claimer, claimRewards[i].token, amountPerUser);
+                emit FCFSAwarded(claimer, claimRewards[i].token, amountPerUser);
                 claimRewards[i].rewardsLeft--;
                 break;
             }
