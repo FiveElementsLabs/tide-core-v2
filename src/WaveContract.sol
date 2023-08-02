@@ -23,8 +23,7 @@ contract WaveContract is ERC2771Context, Ownable, ERC721, SignatureVerifier, IWa
     bool public customMetadata;
     bool public isSoulbound;
 
-    mapping(bytes32 => bool) _claimed;
-    mapping(uint256 => uint256) public tokenIdToRewardId;
+    mapping(address => bool) _claimed;
     mapping(bytes32 => bool) public tokenIdRewardIdxHashToHasWon;
 
     IWaveFactory.TokenRewards[] public claimRewards;
@@ -32,11 +31,6 @@ contract WaveContract is ERC2771Context, Ownable, ERC721, SignatureVerifier, IWa
     uint8 public immutable claimRewardsLength;
     uint8 public immutable raffleRewardsLength;
     bool public raffleStarted;
-
-    struct ClaimParams {
-        uint256 rewardId;
-        address user;
-    }
 
     error OnlyGovernance();
     error OnlyRaffleManager();
@@ -47,7 +41,9 @@ contract WaveContract is ERC2771Context, Ownable, ERC721, SignatureVerifier, IWa
     error PermitDeadlineExpired();
     error NotTransferrable();
 
-    event Claimed(address indexed user, uint256 indexed tokenId, uint256 rewardId);
+    event Claimed(address indexed user, uint256 indexed tokenId);
+    event fcfsAwarded(address indexed user, address indexed token, uint256 amount);
+    event RaffleWon(address indexed user, address indexed token, uint256 amount);
 
     modifier onlyGovernance() {
         if (_msgSender() != factory.keeper()) revert OnlyGovernance();
@@ -105,7 +101,7 @@ contract WaveContract is ERC2771Context, Ownable, ERC721, SignatureVerifier, IWa
 
     /// @notice Allows the governance to set metadata base URI for all tokens
     /// @param _uri The base URI to set
-    /// @param _customMetadata Whether the metadata is encoded with rewardId or tokenId
+    /// @param _customMetadata Whether the metadata is encoded with tokenId
     function changeBaseURI(string memory _uri, bool _customMetadata) public onlyGovernance {
         _metadataBaseURI = _uri;
         customMetadata = _customMetadata;
@@ -132,19 +128,18 @@ contract WaveContract is ERC2771Context, Ownable, ERC721, SignatureVerifier, IWa
 
     /// @notice Execute the mint with permit by verifying the off-chain verifier signature
     /// @dev Also works with gasless EIP-2612 forwarders
-    /// @param rewardId The rewardId to mint
     /// @param deadline The deadline for the permit
     /// @param v The v component of the signature
     /// @param r The r component of the signature
     /// @param s The s component of the signature
-    function claim(uint256 rewardId, uint256 deadline, uint8 v, bytes32 r, bytes32 s) public virtual onlyActive {
-        if (_claimed[keccak256(abi.encode(_msgSender(), rewardId))]) {
+    function claim(uint256 deadline, uint8 v, bytes32 r, bytes32 s) public virtual onlyActive {
+        if (_claimed[_msgSender()]) {
             revert RewardAlreadyClaimed();
         }
         if (block.timestamp > deadline) revert PermitDeadlineExpired();
 
-        _verifySignature(_msgSender(), rewardId, deadline, v, r, s, factory.verifier());
-        _mintReward(_msgSender(), rewardId);
+        _verifySignature(_msgSender(), deadline, v, r, s, factory.verifier());
+        _mintBadge(_msgSender());
 
         _emitERC20Rewards(_msgSender());
     }
@@ -164,7 +159,9 @@ contract WaveContract is ERC2771Context, Ownable, ERC721, SignatureVerifier, IWa
     function fulfillRaffle(uint256[] memory randomNumbers) public onlyEnded onlyRaffleManager {
         for (uint8 i = 0; i < raffleRewardsLength; i++) {
             uint256 randomNumber = randomNumbers[i];
-            IERC20 token = IERC20(raffleRewards[i].token);
+            address tokenAddress = raffleRewards[i].token;
+            uint256 amountPerUser = raffleRewards[i].amountPerUser;
+            IERC20 token = IERC20(tokenAddress);
 
             uint256 counter = 0;
             uint256 rewardsLeft = raffleRewards[i].rewardsLeft;
@@ -176,7 +173,10 @@ contract WaveContract is ERC2771Context, Ownable, ERC721, SignatureVerifier, IWa
                 } while (tokenIdRewardIdxHashToHasWon[keccak256(abi.encodePacked(tokenId, i))]);
 
                 tokenIdRewardIdxHashToHasWon[keccak256(abi.encodePacked(tokenId, i))] = true;
-                token.transfer(ownerOf(tokenId), raffleRewards[i].amountPerUser);
+
+                address winner = ownerOf(tokenId);
+                token.transfer(winner, amountPerUser);
+                emit RaffleWon(winner, tokenAddress, amountPerUser);
             }
         }
     }
@@ -188,7 +188,7 @@ contract WaveContract is ERC2771Context, Ownable, ERC721, SignatureVerifier, IWa
         _requireMinted(tokenId);
         return customMetadata
             ? string(abi.encodePacked(_metadataBaseURI, "/", Strings.toString(tokenId), ".json"))
-            : string(abi.encodePacked(_metadataBaseURI, "/", Strings.toString(tokenIdToRewardId[tokenId]), ".json"));
+            : string(abi.encodePacked(_metadataBaseURI, "/metadata.json"));
     }
 
     /// @dev override the transfer function to allow transfers only if not soulbound
@@ -202,12 +202,10 @@ contract WaveContract is ERC2771Context, Ownable, ERC721, SignatureVerifier, IWa
 
     /// @dev internal function to mint a reward for a user
     /// @param user The user to mint the reward for
-    /// @param rewardId The rewardId to mint
-    function _mintReward(address user, uint256 rewardId) internal {
+    function _mintBadge(address user) internal {
         _safeMint(user, ++lastId);
-        tokenIdToRewardId[lastId] = rewardId;
-        _claimed[keccak256(abi.encode(user, rewardId))] = true;
-        emit Claimed(user, lastId, rewardId);
+        _claimed[user] = true;
+        emit Claimed(user, lastId);
     }
 
     ///@dev use ERC2771Context to get msg data
@@ -232,6 +230,7 @@ contract WaveContract is ERC2771Context, Ownable, ERC721, SignatureVerifier, IWa
 
             if (claimRewards[i].rewardsLeft != 0 && enoughBalance) {
                 token.transfer(claimer, amountPerUser);
+                emit fcfsAwarded(claimer, claimRewards[i].token, amountPerUser);
                 claimRewards[i].rewardsLeft--;
                 break;
             }

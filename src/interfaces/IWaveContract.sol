@@ -12,7 +12,7 @@ interface IWaveContract {
 
     /// @notice Allows the governance to set metadata base URI for all tokens
     /// @param _uri The base URI to set
-    /// @param _customMetadata Whether the metadata is encoded with rewardId or tokenId
+    /// @param _customMetadata Whether the metadata is encoded with tokenId
     function changeBaseURI(string memory _uri, bool _customMetadata) external;
 
     /// @notice Allows the owner to end the campaign early
@@ -23,12 +23,11 @@ interface IWaveContract {
     function withdrawRemainingFunds() external;
 
     /// @notice Execute the mint with permit by verifying the off-chain verifier signature
-    /// @param rewardId The rewardId to mint
     /// @param deadline The deadline for the permit
     /// @param v The v component of the signature
     /// @param r The r component of the signature
     /// @param s The s component of the signature
-    function claim(uint256 rewardId, uint256 deadline, uint8 v, bytes32 r, bytes32 s) external;
+    function claim(uint256 deadline, uint8 v, bytes32 r, bytes32 s) external;
 
     function startRaffle() external;
 
