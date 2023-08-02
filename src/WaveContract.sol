@@ -32,8 +32,8 @@ contract WaveContract is ERC2771Context, Ownable, ERC721, SignatureVerifier, IWa
     uint8 public immutable raffleRewardsLength;
     bool public raffleStarted;
 
-    error OnlyGovernance();
     error OnlyRaffleManager();
+    error OnlyAuthorized();
     error InvalidTimings();
     error CampaignNotActive();
     error CampaignNotEnded();
@@ -49,8 +49,8 @@ contract WaveContract is ERC2771Context, Ownable, ERC721, SignatureVerifier, IWa
     event CampaignForceEnded();
     event FundsWithdrawn();
 
-    modifier onlyGovernance() {
-        if (_msgSender() != factory.keeper()) revert OnlyGovernance();
+    modifier onlyAuthorized() {
+        if (_msgSender() != factory.keeper() && _msgSender() != owner()) revert OnlyAuthorized();
         _;
     }
 
@@ -103,10 +103,10 @@ contract WaveContract is ERC2771Context, Ownable, ERC721, SignatureVerifier, IWa
         }
     }
 
-    /// @notice Allows the governance to set metadata base URI for all tokens
+    /// @notice Allows the governance and the owner of the contract to set metadata base URI for all tokens
     /// @param _uri The base URI to set
-    /// @param _customMetadata Whether the metadata is encoded with tokenId
-    function changeBaseURI(string memory _uri, bool _customMetadata) public onlyGovernance {
+    /// @param _customMetadata Whether the metadata is encoded with rewardId or tokenId
+    function changeBaseURI(string memory _uri, bool _customMetadata) public onlyAuthorized {
         _metadataBaseURI = _uri;
         customMetadata = _customMetadata;
     }
