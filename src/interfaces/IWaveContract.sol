@@ -15,9 +15,15 @@ interface IWaveContract {
     /// @param _customMetadata Whether the metadata is encoded with tokenId
     function changeBaseURI(string memory _uri, bool _customMetadata) external;
 
+    /// @notice Allows the owner to set the campaign start timestamp
+    function setStartTimestamp(uint256 _startTimestamp) external;
+
+    /// @notice Allows the governance to set the campaign end timestamp
+    function setEndTimestamp(uint256 _endTimestamp) external;
+
     /// @notice Allows the owner to end the campaign early
     /// and withdraw remaining funds
-    function endCampaign() external;
+    function endCampaignAndWithdrawFunds() external;
 
     /// @notice Allows the owner to withdraw remaining funds after the campaign has ended
     function withdrawRemainingFunds() external;

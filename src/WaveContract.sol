@@ -111,9 +111,22 @@ contract WaveContract is ERC2771Context, Ownable, ERC721, SignatureVerifier, IWa
         customMetadata = _customMetadata;
     }
 
+    /// @notice Allows the owner to set the campaign start timestamp
+    function setStartTimestamp(uint256 _startTimestamp) public onlyOwner {
+        require(block.timestamp < _startTimestamp && _startTimestamp < endTimestamp, "Invalid start timestamp");
+        startTimestamp = _startTimestamp;
+    }
+
+    /// @notice Allows the governance to set the campaign end timestamp
+    function setEndTimestamp(uint256 _endTimestamp) public onlyOwner {
+        require(raffleRewardsLength == 0, "Can't change end timestamp for raffles");
+        require(_endTimestamp > block.timestamp && _endTimestamp > startTimestamp, "Invalid end timestamp");
+        endTimestamp = _endTimestamp;
+    }
+
     /// @notice Allows the owner to end the campaign early
     /// and withdraw remaining funds
-    function endCampaign() public onlyActive onlyOwner {
+    function endCampaignAndWithdrawFunds() public onlyActive onlyOwner {
         endTimestamp = block.timestamp;
         withdrawRemainingFunds();
         emit CampaignForceEnded();
