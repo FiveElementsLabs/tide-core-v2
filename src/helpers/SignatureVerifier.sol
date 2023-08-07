@@ -7,7 +7,6 @@ import {IERC721} from "../../lib/openzeppelin-contracts/contracts/token/ERC721/I
 contract SignatureVerifier {
     struct Permit {
         address spender;
-        uint256 rewardId;
         uint256 deadline;
     }
 
@@ -18,19 +17,14 @@ contract SignatureVerifier {
 
     constructor(string memory _name) {
         DOMAIN_SEPARATOR = _computeDomainSeparator(bytes(_name));
-        PERMIT_TYPEHASH = keccak256("Permit(address spender,uint256 rewardId,uint256 deadline)");
+        PERMIT_TYPEHASH = keccak256("Permit(address spender,uint256 deadline)");
     }
 
-    function _verifySignature(
-        address sender,
-        uint256 rewardId,
-        uint256 deadline,
-        uint8 v,
-        bytes32 r,
-        bytes32 s,
-        address verifier
-    ) internal view {
-        bytes32 typedDataHash = getTypedDataHash(Permit(sender, rewardId, deadline));
+    function _verifySignature(address sender, uint256 deadline, uint8 v, bytes32 r, bytes32 s, address verifier)
+        internal
+        view
+    {
+        bytes32 typedDataHash = getTypedDataHash(Permit(sender, deadline));
         address recoveredAddress = ecrecover(_prefixed(typedDataHash), v, r, s);
 
         if (recoveredAddress == address(0) || recoveredAddress != verifier) revert InvalidSignature();
@@ -63,7 +57,7 @@ contract SignatureVerifier {
     /// @param _permit The permit struct
     /// @return bytes32 The hash of the permit struct
     function _getStructHash(Permit memory _permit) internal view returns (bytes32) {
-        return keccak256(abi.encode(PERMIT_TYPEHASH, _permit.spender, _permit.rewardId, _permit.deadline));
+        return keccak256(abi.encode(PERMIT_TYPEHASH, _permit.spender, _permit.deadline));
     }
 
     /// @dev Builds a prefixed hash to mimic the behavior of eth_sign.

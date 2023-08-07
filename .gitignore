@@ -15,3 +15,5 @@ docs/
 
 # airnode-protocol
 lib/airnode-protocol
+
+.DS_Store

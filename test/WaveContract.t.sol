@@ -28,7 +28,6 @@ contract WaveTest is Test, Helpers {
 
     uint256 constant CAMPAIGN_DURATION = 100;
     uint256 constant VERIFIER_PRIVATE_KEY = 69420;
-    uint256 constant REWARD_ID = 17;
     uint256 constant REWARD_AMOUNT_PER_USER = 20;
     uint256 constant REWARDS_COUNT = 2;
     uint256 constant USERS_COUNT = 100;
@@ -167,7 +166,7 @@ contract WaveTest is Test, Helpers {
     function _claim(address user, WaveContract wave, bytes4 errorMessage) internal {
         uint256 balance = wave.balanceOf(user);
         uint256 deadline = wave.endTimestamp();
-        bytes32 digest = wave.getTypedDataHash(SignatureVerifier.Permit(user, REWARD_ID, deadline));
+        bytes32 digest = wave.getTypedDataHash(SignatureVerifier.Permit(user, deadline));
 
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(VERIFIER_PRIVATE_KEY, _prefixed(digest));
 
@@ -176,7 +175,7 @@ contract WaveTest is Test, Helpers {
             vm.expectRevert(errorMessage);
         }
 
-        wave.claim(REWARD_ID, deadline, v, r, s);
+        wave.claim(deadline, v, r, s);
 
         if (errorMessage == bytes4(0)) {
             assertEq(wave.balanceOf(user), balance + 1);
