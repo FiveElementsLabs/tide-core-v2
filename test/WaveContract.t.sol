@@ -121,7 +121,7 @@ contract WaveTest is Test, Helpers {
     function test_EndCampaignNoMints() public {
         _initiateClaimRewards(REWARDS_COUNT, REWARD_AMOUNT_PER_USER);
         assertEq(_FCFSWave.owner(), address(this));
-        _FCFSWave.endCampaign();
+        _FCFSWave.endCampaignAndWithdrawFunds();
         assertEq(DAI.balanceOf(address(_FCFSWave)), 0);
         assertEq(DAI.balanceOf(_FCFSWave.owner()), 1 ether);
     }
