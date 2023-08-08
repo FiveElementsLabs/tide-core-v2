@@ -17,8 +17,7 @@ import "./mocked/MockedAirnodeRNG.sol";
 contract WaveTest is Test, Helpers {
     WaveFactory _factory;
     RaffleManager _raffleManager;
-    WaveContract _FCFSWave;
-    WaveContract _raffleWave;
+    WaveContract _wave;
     MockedAirnodeRNG _mockedAirnodeRNG;
     MockedERC20 DAI;
     MockedERC20 WETH;
@@ -61,44 +60,54 @@ contract WaveTest is Test, Helpers {
         }
     }
 
-    function test_WithoutErc20Rewards() public {
+    function test_ClaimNoRewards() public {
+        _initiateBasicWave();
+        _claim(alice, _wave, bytes4(0));
+    }
+
+    function test_EndCampaign() public {
         _factory.deployWave(
             "test", "T", "https://test.com", block.timestamp, block.timestamp + 100, false, claimRewards, raffleRewards
         );
-        _FCFSWave = WaveContract(_factory.waves(0));
+        _wave = WaveContract(_factory.waves(0));
+        uint256 endTimestamp = block.timestamp + CAMPAIGN_DURATION / 2;
+        vm.warp(endTimestamp);
+
+        _wave.endCampaign();
+        assertEq(_wave.endTimestamp(), endTimestamp);
     }
 
     function test_claimWithReward() public {
-        _initiateClaimRewards(REWARDS_COUNT, REWARD_AMOUNT_PER_USER);
+        _initiateFCFSWave(REWARDS_COUNT, REWARD_AMOUNT_PER_USER);
 
-        _claim(alice, _FCFSWave, bytes4(0));
+        _claim(alice, _wave, bytes4(0));
         assertEq(DAI.balanceOf(alice), REWARD_AMOUNT_PER_USER);
 
-        _claim(alice, _FCFSWave, RewardAlreadyClaimed.selector);
+        _claim(alice, _wave, RewardAlreadyClaimed.selector);
 
-        _claim(bob, _FCFSWave, bytes4(0));
+        _claim(bob, _wave, bytes4(0));
         assertEq(DAI.balanceOf(bob), REWARD_AMOUNT_PER_USER);
 
-        _claim(charlie, _FCFSWave, bytes4(0));
+        _claim(charlie, _wave, bytes4(0));
         assertEq(DAI.balanceOf(charlie), 0);
 
         vm.warp(block.timestamp + CAMPAIGN_DURATION + 1);
-        _claim(charlie, _FCFSWave, CampaignNotActive.selector);
+        _claim(charlie, _wave, CampaignNotActive.selector);
     }
 
     function test_raffleWithReward() public {
         uint256 rewardsCount = 55;
-        _initiateRaffleRewards(rewardsCount, REWARD_AMOUNT_PER_USER);
+        _initiateRaffleWave(rewardsCount, REWARD_AMOUNT_PER_USER);
 
         vm.expectRevert(CampaignNotEnded.selector);
-        _raffleWave.startRaffle();
+        _wave.startRaffle();
 
         for (uint256 i = 0; i < addresses.length; i++) {
-            _claim(addresses[i], _raffleWave, bytes4(0));
+            _claim(addresses[i], _wave, bytes4(0));
         }
 
         vm.warp(block.timestamp + CAMPAIGN_DURATION + 1);
-        _raffleWave.startRaffle();
+        _wave.startRaffle();
 
         _mockedAirnodeRNG.fulfillRequest();
 
@@ -116,29 +125,53 @@ contract WaveTest is Test, Helpers {
 
         assertEq(totalWinners, rewardsCount);
         assertEq(totalBalanceRaffled, REWARD_AMOUNT_PER_USER * rewardsCount);
+
+        assertEq(DAI.balanceOf(address(this)), 1 ether - totalBalanceRaffled);
     }
 
     function test_EndCampaignNoMints() public {
-        _initiateClaimRewards(REWARDS_COUNT, REWARD_AMOUNT_PER_USER);
-        assertEq(_FCFSWave.owner(), address(this));
-        _FCFSWave.endCampaignAndWithdrawFunds();
-        assertEq(DAI.balanceOf(address(_FCFSWave)), 0);
-        assertEq(DAI.balanceOf(_FCFSWave.owner()), 1 ether);
+        _initiateFCFSWave(REWARDS_COUNT, REWARD_AMOUNT_PER_USER);
+        assertEq(_wave.owner(), address(this));
+
+        vm.warp(block.timestamp + CAMPAIGN_DURATION + 1);
+        _wave.withdrawClaimRewardsFunds();
+        assertEq(DAI.balanceOf(address(_wave)), 0);
+        assertEq(DAI.balanceOf(_wave.owner()), 1 ether);
+    }
+
+    function test_WithdrawClaimRewardsFunds() public {
+        _initiateFCFSWave(REWARDS_COUNT, REWARD_AMOUNT_PER_USER);
+
+        vm.expectRevert(CampaignNotEnded.selector);
+        _wave.withdrawClaimRewardsFunds();
+
+        vm.warp(block.timestamp + CAMPAIGN_DURATION + 1);
+        _wave.withdrawClaimRewardsFunds();
+        assertEq(DAI.balanceOf(address(_wave)), 0);
+        assertEq(DAI.balanceOf(_wave.owner()), 1 ether);
     }
 
     function test_WithdrawOnlyAfterCampaignEnd() public {
-        _initiateClaimRewards(REWARDS_COUNT, REWARD_AMOUNT_PER_USER);
+        _initiateFCFSWave(REWARDS_COUNT, REWARD_AMOUNT_PER_USER);
 
         vm.expectRevert(CampaignNotEnded.selector);
-        _FCFSWave.withdrawRemainingFunds();
+        _wave.withdrawClaimRewardsFunds();
 
         vm.warp(block.timestamp + CAMPAIGN_DURATION + 1);
-        _FCFSWave.withdrawRemainingFunds();
-        assertEq(DAI.balanceOf(address(_FCFSWave)), 0);
-        assertEq(DAI.balanceOf(_FCFSWave.owner()), 1 ether);
+        _wave.withdrawClaimRewardsFunds();
+        assertEq(DAI.balanceOf(address(_wave)), 0);
+        assertEq(DAI.balanceOf(_wave.owner()), 1 ether);
     }
 
-    function _initiateClaimRewards(uint256 rewardsCount, uint256 rewardAmountPerUser) internal {
+    function _initiateBasicWave() internal {
+        _factory.deployWave(
+            "test", "T", "https://test.com", block.timestamp, block.timestamp + 100, false, claimRewards, raffleRewards
+        );
+
+        _wave = WaveContract(_factory.waves(0));
+    }
+
+    function _initiateFCFSWave(uint256 rewardsCount, uint256 rewardAmountPerUser) internal {
         claimRewards.push(IWaveFactory.TokenRewards(rewardsCount, rewardAmountPerUser, address(DAI)));
         DAI.approve(address(_factory), 1 ether);
         WETH.approve(address(_factory), 1 ether);
@@ -147,20 +180,20 @@ contract WaveTest is Test, Helpers {
             "test", "T", "https://test.com", block.timestamp, block.timestamp + 100, false, claimRewards, raffleRewards
         );
 
-        _FCFSWave = WaveContract(_factory.waves(0));
+        _wave = WaveContract(_factory.waves(0));
 
-        assertEq(DAI.balanceOf(address(_FCFSWave)), rewardsCount * rewardAmountPerUser);
+        assertEq(DAI.balanceOf(address(_wave)), rewardsCount * rewardAmountPerUser);
     }
 
-    function _initiateRaffleRewards(uint256 rewardsCount, uint256 rewardAmountPerUser) internal {
+    function _initiateRaffleWave(uint256 rewardsCount, uint256 rewardAmountPerUser) internal {
         raffleRewards.push(IWaveFactory.TokenRewards(rewardsCount, rewardAmountPerUser, address(DAI)));
         DAI.approve(address(_factory), 1 ether);
 
         _factory.deployWave(
             "test", "T", "https://test.com", block.timestamp, block.timestamp + 100, false, claimRewards, raffleRewards
         );
-        _raffleWave = WaveContract(_factory.waves(0));
-        assertEq(DAI.balanceOf(address(_raffleWave)), rewardsCount * rewardAmountPerUser);
+        _wave = WaveContract(_factory.waves(0));
+        assertEq(DAI.balanceOf(address(_wave)), rewardsCount * rewardAmountPerUser);
     }
 
     function _claim(address user, WaveContract wave, bytes4 errorMessage) internal {
