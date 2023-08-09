@@ -1,7 +1,7 @@
 //SPDX-License-Identifier: MIT
 pragma solidity 0.8.21;
 
-import "../lib/airnode-protocol/contracts/rrp/requesters/RrpRequesterV0.sol";
+import "../lib/airnode/packages/airnode-protocol/contracts/rrp/requesters/RrpRequesterV0.sol";
 import {IWaveFactory} from "./interfaces/IWaveFactory.sol";
 import {IWaveContract} from "./interfaces/IWaveContract.sol";
 

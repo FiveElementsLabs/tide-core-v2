@@ -13,7 +13,4 @@ docs/
 # Dotenv file
 .env
 
-# airnode-protocol
-lib/airnode-protocol
-
 .DS_Store
