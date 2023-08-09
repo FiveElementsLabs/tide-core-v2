@@ -11,6 +11,7 @@ contract RaffleManager is RrpRequesterV0 {
 
     address public airnode;
     bytes32 public endpointIdUint256Array;
+    address public sponsor;
     address public sponsorWallet;
 
     IWaveFactory public waveFactory;
@@ -34,13 +35,17 @@ contract RaffleManager is RrpRequesterV0 {
     /// @notice Sets parameters used in requesting QRNG services
     /// @param _airnode Airnode address
     /// @param _endpointIdUint256Array Endpoint ID used to request a `uint256[]`
-    /// @param _sponsorWallet Sponsor wallet address
-    function setRequestParameters(address _airnode, bytes32 _endpointIdUint256Array, address _sponsorWallet)
-        external
-        onlyGovernance
-    {
+    /// @param _sponsor address used to sponsor this requester
+    /// @param _sponsorWallet Sponsor wallet address, used for gas by Airnode
+    function setRequestParameters(
+        address _airnode,
+        bytes32 _endpointIdUint256Array,
+        address _sponsor,
+        address _sponsorWallet
+    ) external onlyGovernance {
         airnode = _airnode;
         endpointIdUint256Array = _endpointIdUint256Array;
+        sponsor = _sponsor;
         sponsorWallet = _sponsorWallet;
     }
 
@@ -50,7 +55,7 @@ contract RaffleManager is RrpRequesterV0 {
         requestId = airnodeRrp.makeFullRequest(
             airnode,
             endpointIdUint256Array,
-            address(this),
+            sponsor,
             sponsorWallet,
             address(this),
             this.fulfillUint256Array.selector,
