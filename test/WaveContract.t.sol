@@ -29,13 +29,11 @@ contract WaveTest is Test, Helpers {
     uint256 constant VERIFIER_PRIVATE_KEY = 69420;
     uint256 constant REWARD_AMOUNT_PER_USER = 20;
     uint256 constant REWARDS_COUNT = 2;
-    uint256 constant USERS_COUNT = 100;
     address immutable verifier = vm.addr(VERIFIER_PRIVATE_KEY);
     address immutable alice = vm.addr(1000);
     address immutable bob = vm.addr(1001);
     address immutable charlie = vm.addr(1002);
     address immutable dave = vm.addr(1003);
-    address[] addresses;
 
     error CampaignNotActive();
     error CampaignNotEnded();
@@ -55,9 +53,6 @@ contract WaveTest is Test, Helpers {
         WETH = new MockedERC20("WETH", "WETH");
         DAI.mint(address(this), 1 ether);
         WETH.mint(address(this), 1 ether);
-        for (uint256 i = 1; i <= USERS_COUNT; i++) {
-            addresses.push(vm.addr(i));
-        }
     }
 
     function test_ClaimNoRewards() public {
@@ -95,38 +90,18 @@ contract WaveTest is Test, Helpers {
         _claim(charlie, _wave, CampaignNotActive.selector);
     }
 
-    function test_raffleWithReward() public {
-        uint256 rewardsCount = 55;
-        _initiateRaffleWave(rewardsCount, REWARD_AMOUNT_PER_USER);
+    /// @dev number of claims <= number of rewards
+    function test_RaffleWithRewards_1() public {
+        uint256 rewardsCount = 2;
+        uint256 usersCount = 1;
+        _raffle(rewardsCount, usersCount);
+    }
 
-        vm.expectRevert(CampaignNotEnded.selector);
-        _wave.startRaffle();
-
-        for (uint256 i = 0; i < addresses.length; i++) {
-            _claim(addresses[i], _wave, bytes4(0));
-        }
-
-        vm.warp(block.timestamp + CAMPAIGN_DURATION + 1);
-        _wave.startRaffle();
-
-        _mockedAirnodeRNG.fulfillRequest();
-
-        uint256 totalBalanceRaffled = 0;
-        uint256 totalWinners = 0;
-
-        for (uint256 i = 0; i < addresses.length; i++) {
-            uint256 balance = DAI.balanceOf(addresses[i]);
-            if (balance > 0) {
-                totalWinners++;
-                assertEq(balance, REWARD_AMOUNT_PER_USER);
-                totalBalanceRaffled += balance;
-            }
-        }
-
-        assertEq(totalWinners, rewardsCount);
-        assertEq(totalBalanceRaffled, REWARD_AMOUNT_PER_USER * rewardsCount);
-
-        assertEq(DAI.balanceOf(address(this)), 1 ether - totalBalanceRaffled);
+    /// @dev number of claims > number of rewards
+    function test_RaffleWithRewards_2() public {
+        uint256 rewardsCount = 10;
+        uint256 usersCount = 100;
+        _raffle(rewardsCount, usersCount);
     }
 
     function test_EndCampaignNoMints() public {
@@ -213,5 +188,48 @@ contract WaveTest is Test, Helpers {
         if (errorMessage == bytes4(0)) {
             assertEq(wave.balanceOf(user), balance + 1);
         }
+    }
+
+    function _raffle(uint256 rewardsCount, uint256 usersCount) internal {
+        address[] memory addresses = new address[](usersCount);
+        for (uint256 i = 0; i < usersCount; i++) {
+            addresses[i] = vm.addr(i + 1);
+        }
+
+        _initiateRaffleWave(rewardsCount, REWARD_AMOUNT_PER_USER);
+
+        vm.expectRevert(CampaignNotEnded.selector);
+        _wave.startRaffle();
+
+        for (uint256 i = 0; i < addresses.length; i++) {
+            _claim(addresses[i], _wave, bytes4(0));
+        }
+
+        vm.warp(block.timestamp + CAMPAIGN_DURATION + 1);
+        _wave.startRaffle();
+
+        _mockedAirnodeRNG.fulfillRequest();
+
+        uint256 totalBalanceRaffled = 0;
+        uint256 totalWinners = 0;
+
+        for (uint256 i = 0; i < addresses.length; i++) {
+            uint256 balance = DAI.balanceOf(addresses[i]);
+            if (balance > 0) {
+                totalWinners++;
+                assertEq(balance, REWARD_AMOUNT_PER_USER);
+                totalBalanceRaffled += balance;
+            }
+        }
+
+        if (addresses.length <= rewardsCount) {
+            assertEq(totalWinners, addresses.length);
+        } else {
+            assertEq(totalWinners, rewardsCount);
+        }
+
+        assertEq(totalBalanceRaffled, REWARD_AMOUNT_PER_USER * totalWinners);
+
+        assertEq(DAI.balanceOf(address(this)), 1 ether - totalBalanceRaffled);
     }
 }

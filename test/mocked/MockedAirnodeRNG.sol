@@ -30,10 +30,12 @@ contract MockedAirnodeRNG {
     function setSponsorshipStatus(address, bool) public {}
 
     constructor() {
-        randomNumbers.push(0x5bca26cd9c4047f3a0d15b21bf65fc193a355166f37cbcca43eb05841441ffc2);
-        randomNumbers.push(0xeb1205693130aa0c9be78c558f318300212aa4cbc240dad3c10bd91b03f8e3b4);
-        randomNumbers.push(0xe6fe2da443fbbe51cbe3045e6e9e192dd2a9053d1e3aafd8fba966999345ea2e);
-        randomNumbers.push(0x9beb59759dd947b526812f468b917f138f1d4f8157a614cb82653c603b0fd5eb);
+        randomNumbers.push(0x851e1cb4e96bc45703f7d513500ded918a7fdb7812e938b52d85a812691621f5);
+
+        // randomNumbers.push(0x5bca26cd9c4047f3a0d15b21bf65fc193a355166f37cbcca43eb05841441ffc2);
+        // randomNumbers.push(0xeb1205693130aa0c9be78c558f318300212aa4cbc240dad3c10bd91b03f8e3b4);
+        // randomNumbers.push(0xe6fe2da443fbbe51cbe3045e6e9e192dd2a9053d1e3aafd8fba966999345ea2e);
+        // randomNumbers.push(0x9beb59759dd947b526812f468b917f138f1d4f8157a614cb82653c603b0fd5eb);
         // randomNumbers.push(0x18a2ed68533cca28d338b79b900d2bad85681f0531deb41b15bb017932deddcc);
         // randomNumbers.push(0xd5a55f77e1ea3addf640a4c1f1b9f4e4291ec2e05a9c587c2112a25dfd1d747d);
         // randomNumbers.push(0x93f250a11b6155432b79770e7d90e42212c398a450166f69d82fecc72ab49fc9);
