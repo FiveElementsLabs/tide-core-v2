@@ -13,6 +13,7 @@ contract WaveFactory is Ownable, IWaveFactory {
     address public trustedForwarder;
     address public verifier;
     address public raffleManager;
+    mapping(address => bool) public isRaffleWave;
 
     error TooManyRewards();
 
@@ -86,6 +87,10 @@ contract WaveFactory is Ownable, IWaveFactory {
 
         waves.push(address(wave));
         wave.transferOwnership(msg.sender);
+
+        if (_raffleRewards.length > 0) {
+            isRaffleWave[address(wave)] = true;
+        }
 
         _initiateRewards(_claimRewards, address(wave));
         _initiateRewards(_raffleRewards, address(wave));

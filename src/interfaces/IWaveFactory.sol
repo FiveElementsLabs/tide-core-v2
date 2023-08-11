@@ -25,4 +25,6 @@ interface IWaveFactory {
     function verifier() external view returns (address);
 
     function raffleManager() external view returns (address);
+
+    function isRaffleWave(address) external view returns (bool);
 }

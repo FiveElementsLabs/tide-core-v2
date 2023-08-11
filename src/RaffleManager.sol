@@ -4,13 +4,15 @@ pragma solidity 0.8.21;
 import "../lib/airnode/packages/airnode-protocol/contracts/rrp/requesters/RrpRequesterV0.sol";
 import {IWaveFactory} from "./interfaces/IWaveFactory.sol";
 import {IWaveContract} from "./interfaces/IWaveContract.sol";
+import {Ownable} from "../lib/openzeppelin-contracts/contracts/access/Ownable.sol";
 
-contract RaffleManager is RrpRequesterV0 {
+contract RaffleManager is RrpRequesterV0, Ownable {
     event RequestedUint256Array(bytes32 indexed requestId, uint256 size);
     event ReceivedUint256Array(bytes32 indexed requestId, uint256[] response);
 
     address public airnode;
     bytes32 public endpointIdUint256Array;
+    address public sponsor;
     address public sponsorWallet;
 
     IWaveFactory public waveFactory;
@@ -18,8 +20,10 @@ contract RaffleManager is RrpRequesterV0 {
     mapping(bytes32 => bool) public expectingRequestWithIdToBeFulfilled;
     mapping(bytes32 => address) public requestToRequester;
 
-    modifier onlyGovernance() {
-        require(msg.sender == waveFactory.keeper(), "Only governance can call this function.");
+    error OnlyRaffleWave();
+
+    modifier onlyRaffleWave() {
+        if (!waveFactory.isRaffleWave(msg.sender)) revert OnlyRaffleWave();
         _;
     }
 
@@ -27,30 +31,34 @@ contract RaffleManager is RrpRequesterV0 {
     /// that will be fulfilled by its sponsor wallet. See the Airnode protocol
     /// docs about sponsorship for more information.
     /// @param _airnodeRrp Airnode RRP contract address
-    constructor(address _airnodeRrp, IWaveFactory _waveFactory) RrpRequesterV0(_airnodeRrp) {
+    constructor(address _airnodeRrp, IWaveFactory _waveFactory) RrpRequesterV0(_airnodeRrp) Ownable() {
         waveFactory = _waveFactory;
     }
 
     /// @notice Sets parameters used in requesting QRNG services
     /// @param _airnode Airnode address
     /// @param _endpointIdUint256Array Endpoint ID used to request a `uint256[]`
-    /// @param _sponsorWallet Sponsor wallet address
-    function setRequestParameters(address _airnode, bytes32 _endpointIdUint256Array, address _sponsorWallet)
-        external
-        onlyGovernance
-    {
+    /// @param _sponsor address used to sponsor this requester
+    /// @param _sponsorWallet Sponsor wallet address, used for gas by Airnode
+    function setRequestParameters(
+        address _airnode,
+        bytes32 _endpointIdUint256Array,
+        address _sponsor,
+        address _sponsorWallet
+    ) external onlyOwner {
         airnode = _airnode;
         endpointIdUint256Array = _endpointIdUint256Array;
+        sponsor = _sponsor;
         sponsorWallet = _sponsorWallet;
     }
 
     /// @notice Requests a `uint256[]`
     /// @param size Size of the requested array
-    function makeRequestUint256Array(uint256 size) external returns (bytes32 requestId) {
+    function makeRequestUint256Array(uint256 size) external onlyRaffleWave() returns (bytes32 requestId) {
         requestId = airnodeRrp.makeFullRequest(
             airnode,
             endpointIdUint256Array,
-            address(this),
+            sponsor,
             sponsorWallet,
             address(this),
             this.fulfillUint256Array.selector,
@@ -70,8 +78,8 @@ contract RaffleManager is RrpRequesterV0 {
         require(expectingRequestWithIdToBeFulfilled[requestId], "Request ID not known");
         expectingRequestWithIdToBeFulfilled[requestId] = false;
         uint256[] memory _qrngUint256Array = abi.decode(data, (uint256[]));
+        emit ReceivedUint256Array(requestId, _qrngUint256Array);
 
         IWaveContract(requestToRequester[requestId]).fulfillRaffle(_qrngUint256Array);
-        emit ReceivedUint256Array(requestId, _qrngUint256Array);
     }
 }
