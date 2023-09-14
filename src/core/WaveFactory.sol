@@ -2,10 +2,10 @@
 pragma solidity ^0.8.21;
 pragma abicoder v2;
 
-import {Ownable} from "../lib/openzeppelin-contracts/contracts/access/Ownable.sol";
+import {Ownable} from "lib/openzeppelin-contracts/contracts/access/Ownable.sol";
 import {WaveContract} from "./WaveContract.sol";
-import {IWaveFactory} from "./interfaces/IWaveFactory.sol";
-import {IERC20} from "../lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
+import {IWaveFactory} from "../interfaces/IWaveFactory.sol";
+import {IERC20} from "lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 
 contract WaveFactory is Ownable, IWaveFactory {
     address[] public waves;
