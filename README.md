@@ -1,10 +1,10 @@
 ```
-                                                  .YB#G7                 .JYYJ:                     
-                          ..::         .::::      ^&@@@B.                .&@@&~                     
-        :!?Y5P5.      :?5B#&@B:        !&@@#.      ^?J7:                 .&@@&~                     
-      !P&@@@@@#.    ~P&@@@@@@#:        !@@@&.                    .:::.   .&@@&~         .:::.     
-  .:7B@@@@@@#BP~~!JG@@@@@@B5J7.     JBB#@@@@BBBBP  YBBB7     ^?PB&@@@&B5~:#@@&~     ~JG#&@@@&BP?^   
-GB#&@@@@@#J~. .#@@@@@@@&5^          JGGB@@@@GGGG5  G@@@J   ^P@@@@G5YY5G&@B&@@&~   7B@@@B5J?J5#@@@G^ 
+                                                  .YB#G7                 .JYYJ:
+                          ..::         .::::      ^&@@@B.                .&@@&~
+        :!?Y5P5.      :?5B#&@B:        !&@@#.      ^?J7:                 .&@@&~
+      !P&@@@@@#.    ~P&@@@@@@#:        !@@@&.                    .:::.   .&@@&~         .:::.
+  .:7B@@@@@@#BP~~!JG@@@@@@B5J7.     JBB#@@@@BBBBP  YBBB7     ^?PB&@@@&B5~:#@@&~     ~JG#&@@@&BP?^
+GB#&@@@@@#J~. .#@@@@@@@&5^          JGGB@@@@GGGG5  G@@@J   ^P@@@@G5YY5G&@B&@@&~   7B@@@B5J?J5#@@@G^
 @@@@@@&B?.    .&@@@@#G?:   ...         !@@@#.      G@@@J  ~&@@@5:      .J&@@@&~  Y@@@G^       !#@@&!
 GGPYJ!:  ^7JY5Y77!~:. .!YPB#&G:        !@@@#.      G@@@J .B@@@5          7@@@&~ !@@@&?~!!!!!!!~5@@@#
       ~5#@@@@@#     ^5&@@@@@@#:        !@@@#.      G@@@J :#@@@7          .&@@&~ J@@@@#&&&&&&&&&####&
@@ -19,7 +19,9 @@ We are building the most innovative acquisition and retention mechanisms to chan
 
 # Tide Protocol Smart Contracts
 
-This repository contains the smart contracts for Tide Protocol. We used Foundry as a development environment to compile, test, deploy and verify our contracts.
+This repository contains the smart contracts for Tide Protocol.
+We used Foundry as a development environment to compile, test, deploy and verify our contracts.
+We used API3 as the source for random number generation.
 
 ## Documentation
 
