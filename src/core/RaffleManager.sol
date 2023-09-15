@@ -1,10 +1,10 @@
 //SPDX-License-Identifier: MIT
 pragma solidity 0.8.21;
 
-import "../lib/airnode/packages/airnode-protocol/contracts/rrp/requesters/RrpRequesterV0.sol";
-import {IWaveFactory} from "./interfaces/IWaveFactory.sol";
-import {IWaveContract} from "./interfaces/IWaveContract.sol";
-import {Ownable} from "../lib/openzeppelin-contracts/contracts/access/Ownable.sol";
+import "lib/airnode/packages/airnode-protocol/contracts/rrp/requesters/RrpRequesterV0.sol";
+import {IWaveFactory} from "../interfaces/IWaveFactory.sol";
+import {IWaveContract} from "../interfaces/IWaveContract.sol";
+import {Ownable} from "lib/openzeppelin-contracts/contracts/access/Ownable.sol";
 
 contract RaffleManager is RrpRequesterV0, Ownable {
     event RequestedUint256Array(bytes32 indexed requestId, uint256 size);
@@ -54,7 +54,7 @@ contract RaffleManager is RrpRequesterV0, Ownable {
 
     /// @notice Requests a `uint256[]`
     /// @param size Size of the requested array
-    function makeRequestUint256Array(uint256 size) external onlyRaffleWave() returns (bytes32 requestId) {
+    function makeRequestUint256Array(uint256 size) external onlyRaffleWave returns (bytes32 requestId) {
         requestId = airnodeRrp.makeFullRequest(
             airnode,
             endpointIdUint256Array,

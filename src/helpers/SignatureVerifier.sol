@@ -20,6 +20,13 @@ contract SignatureVerifier {
         PERMIT_TYPEHASH = keccak256("Permit(address spender,uint256 deadline)");
     }
 
+    /// @dev reverts if that the message was not signed by the verifier or if the deadline is passed
+    /// @param sender transaction sender
+    /// @param deadline signature deadline
+    /// @param v v component of the signed message
+    /// @param r r component of the signed message
+    /// @param s s component of the signed message
+    /// @param verifier address of the verifier
     function _verifySignature(address sender, uint256 deadline, uint8 v, bytes32 r, bytes32 s, address verifier)
         internal
         view
