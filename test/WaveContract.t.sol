@@ -5,9 +5,9 @@ pragma abicoder v2;
 import "../lib/forge-std/src/Test.sol";
 import "../lib/forge-std/src/console.sol";
 import "../lib/forge-std/src/StdUtils.sol";
-import "../src/WaveContract.sol";
-import "../src/WaveFactory.sol";
-import "../src/RaffleManager.sol";
+import "../src/core/WaveContract.sol";
+import "../src/core/WaveFactory.sol";
+import "../src/core/RaffleManager.sol";
 import "../src/interfaces/IWaveFactory.sol";
 import "./mocked/MockedERC20.sol";
 import "../src/helpers/SignatureVerifier.sol";
@@ -99,8 +99,8 @@ contract WaveTest is Test, Helpers {
 
     /// @dev number of claims > number of rewards
     function test_RaffleWithRewards_2() public {
-        uint256 rewardsCount = 10;
-        uint256 usersCount = 100;
+        uint256 rewardsCount = 300;
+        uint256 usersCount = 10000;
         _raffle(rewardsCount, usersCount);
     }
 
