@@ -9,11 +9,13 @@ arbitrum = "${ARBITRUM_RPC_URL}"
 polygon = "${POLYGON_RPC_URL}" 
 mainnet = "${ETHEREUM_RPC_URL}" 
 optimism = "${OPTIMISM_RPC_URL}"
+base = "${BASESCAN_RPC_URL}"
 
 [etherscan]
 arbitrum = { key = "${ARBISCAN_API_KEY}" }
 polygon = { key = "${POLYGONSCAN_API_KEY}" }
 mainnet = { key = "${ETHERSCAN_API_KEY}" }
 optimism = { key = "${OPTIMISTIC_ETHERSCAN_API_KEY}" }
+base = { key = "${BASESCAN_API_KEY}" }
 
 # See more config options https://github.com/foundry-rs/foundry/tree/master/config
