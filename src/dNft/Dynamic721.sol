@@ -4,32 +4,39 @@ pragma solidity 0.8.21;
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import "@openzeppelin/contracts/utils/Strings.sol";
 import {ERC2771Context, Context} from "lib/openzeppelin-contracts/contracts/metatx/ERC2771Context.sol";
-import {Ownable} from "lib/openzeppelin-contracts/contracts/access/Ownable.sol";
 
-contract Dynamic721 is ERC2771Context, ERC721, Ownable {
+interface IFactory {
+    function owner() external view returns (address);
+}
+
+contract Dynamic721 is ERC2771Context, ERC721 {
     using Strings for uint256;
     using Strings for address;
 
     uint256 public lastId;
     string baseURI;
     mapping(address => bool) claimed;
+    IFactory factory;
 
     event Claimed(address user, uint256 tokenId);
 
     error AlreadyClaimed();
+    error OnlyGovernance();
 
-    constructor(
-        string memory _name,
-        string memory _symbol,
-        string memory _baseURI,
-        address _trustedForwarder,
-        address _owner
-    ) ERC2771Context(_trustedForwarder) ERC721(_name, _symbol) Ownable() {
+    constructor(string memory _name, string memory _symbol, string memory _baseURI, address _trustedForwarder)
+        ERC2771Context(_trustedForwarder)
+        ERC721(_name, _symbol)
+    {
         baseURI = _baseURI;
-        _transferOwnership(_owner);
+        factory = IFactory(_msgSender());
     }
 
-    function setBaseURI(string memory _baseURI) public onlyOwner {
+    modifier onlyGovernance() {
+        if (_msgSender() != factory.owner()) revert OnlyGovernance();
+        _;
+    }
+
+    function setBaseURI(string memory _baseURI) public onlyGovernance {
         baseURI = _baseURI;
     }
 

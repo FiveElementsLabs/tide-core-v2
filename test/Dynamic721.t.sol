@@ -6,8 +6,10 @@ import "../lib/forge-std/src/Test.sol";
 import "../lib/forge-std/src/console.sol";
 import "../lib/forge-std/src/StdUtils.sol";
 import "../src/dNft/Dynamic721.sol";
+import "../src/dNft/Factory.sol";
 
 contract Dynamic721Test is Test {
+    Factory factory;
     Dynamic721 nft;
     string baseUri = "https://myUrl.com/api";
 
@@ -15,7 +17,8 @@ contract Dynamic721Test is Test {
     error OnlyGovernance();
 
     function setUp() public {
-        nft = new Dynamic721("name", "SMB", baseUri, vm.addr(3), vm.addr(4));
+        factory = new Factory(vm.addr(1010101010));
+        nft = Dynamic721(factory.create("Name", "SYM", baseUri));
     }
 
     function test_CheckUri() public {
@@ -37,10 +40,10 @@ contract Dynamic721Test is Test {
 
     function test_baseUriUpdate() public {
         vm.prank(vm.addr(1003));
-        vm.expectRevert("Ownable: caller is not the owner");
+        vm.expectRevert(OnlyGovernance.selector);
         nft.setBaseURI("https://scam.it");
 
-        address owner = nft.owner();
+        address owner = factory.owner();
         vm.prank(owner);
         nft.setBaseURI("https://mynewsite.com/api");
     }
