@@ -41,12 +41,7 @@ contract WaveTest is Test, Helpers {
 
     function setUp() public {
         _mockedAirnodeRNG = new MockedAirnodeRNG();
-        _factory = new WaveFactory(
-            address(this),
-            address(0),
-            verifier,
-            address(0)
-        );
+        _factory = new WaveFactory(address(this), address(0), verifier, address(0));
         _raffleManager = new RaffleManager(address(_mockedAirnodeRNG), _factory);
         _factory.changeRaffleManager(address(_raffleManager));
         DAI = new MockedERC20("DAI", "DAI");
