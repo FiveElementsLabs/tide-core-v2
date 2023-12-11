@@ -21,12 +21,15 @@ contract Dynamic721 is ERC2771Context, ERC721 {
     event Claimed(address user, uint256 tokenId);
 
     error AlreadyClaimed();
+    error EmptyBaseUri();
+    error NotTransferrable();
     error OnlyGovernance();
 
     constructor(string memory _name, string memory _symbol, string memory _baseURI, address _trustedForwarder)
         ERC2771Context(_trustedForwarder)
         ERC721(_name, _symbol)
     {
+        if (bytes(_baseURI).length == 0) revert EmptyBaseUri();
         baseURI = _baseURI;
         factory = IFactory(_msgSender());
     }
@@ -37,24 +40,23 @@ contract Dynamic721 is ERC2771Context, ERC721 {
     }
 
     function setBaseURI(string memory _baseURI) public onlyGovernance {
+        if (bytes(_baseURI).length == 0) revert EmptyBaseUri();
         baseURI = _baseURI;
     }
 
     function tokenURI(uint256 tokenId) public view override returns (string memory) {
         _requireMinted(tokenId);
-        return bytes(baseURI).length > 0
-            ? string(
-                abi.encodePacked(
-                    baseURI,
-                    "/",
-                    uint256(block.chainid).toString(),
-                    "/",
-                    address(this).toHexString(),
-                    "/",
-                    tokenId.toString()
-                )
+        return string(
+            abi.encodePacked(
+                baseURI,
+                "/",
+                uint256(block.chainid).toString(),
+                "/",
+                address(this).toHexString(),
+                "/",
+                ownerOf(tokenId).toHexString()
             )
-            : "";
+        );
     }
 
     function claim() public {
@@ -66,6 +68,14 @@ contract Dynamic721 is ERC2771Context, ERC721 {
         claimed[msgSender] = true;
 
         emit Claimed(msgSender, lastId);
+    }
+
+    /// @dev override the transfer function to allow transfers only if not soulbound
+    /// @param from The address to transfer from
+    /// @param to The address to transfer to
+    /// @param tokenId The token ID to transfer
+    function _transfer(address from, address to, uint256 tokenId) internal pure override {
+        revert NotTransferrable();
     }
 
     ///@dev use ERC2771Context to get msg data
