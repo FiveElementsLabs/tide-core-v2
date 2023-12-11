@@ -7,8 +7,8 @@ import {IWaveContract} from "../interfaces/IWaveContract.sol";
 import {Ownable} from "lib/openzeppelin-contracts/contracts/access/Ownable.sol";
 
 contract RaffleManager is RrpRequesterV0, Ownable {
-    event RequestedUint256Array(bytes32 indexed requestId, uint256 size);
-    event ReceivedUint256Array(bytes32 indexed requestId, uint256[] response);
+    event RequestedUint256(bytes32 indexed requestId);
+    event ReceivedUint256(bytes32 indexed requestId, uint256 response);
 
     address public airnode;
     bytes32 public endpointIdUint256Array;
@@ -52,34 +52,26 @@ contract RaffleManager is RrpRequesterV0, Ownable {
         sponsorWallet = _sponsorWallet;
     }
 
-    /// @notice Requests a `uint256[]`
-    /// @param size Size of the requested array
-    function makeRequestUint256Array(uint256 size) external onlyRaffleWave returns (bytes32 requestId) {
+    /// @notice Requests a `uint256`
+    function makeRequestUint256() external onlyRaffleWave returns (bytes32 requestId) {
         requestId = airnodeRrp.makeFullRequest(
-            airnode,
-            endpointIdUint256Array,
-            sponsor,
-            sponsorWallet,
-            address(this),
-            this.fulfillUint256Array.selector,
-            // @dev Using Airnode ABI to encode the parameters
-            abi.encode(bytes32("1u"), bytes32("size"), size)
+            airnode, endpointIdUint256Array, sponsor, sponsorWallet, address(this), this.fulfillUint256.selector, ""
         );
         expectingRequestWithIdToBeFulfilled[requestId] = true;
         requestToRequester[requestId] = msg.sender;
-        emit RequestedUint256Array(requestId, size);
+        emit RequestedUint256(requestId);
     }
 
     /// @notice Called by the Airnode through the AirnodeRrp contract to
     /// fulfill the request
     /// @param requestId Request ID
     /// @param data ABI-encoded response
-    function fulfillUint256Array(bytes32 requestId, bytes calldata data) external onlyAirnodeRrp {
+    function fulfillUint256(bytes32 requestId, bytes calldata data) external onlyAirnodeRrp {
         require(expectingRequestWithIdToBeFulfilled[requestId], "Request ID not known");
         expectingRequestWithIdToBeFulfilled[requestId] = false;
-        uint256[] memory _qrngUint256Array = abi.decode(data, (uint256[]));
-        emit ReceivedUint256Array(requestId, _qrngUint256Array);
+        uint256 _qrngUint256 = abi.decode(data, (uint256));
+        emit ReceivedUint256(requestId, _qrngUint256);
 
-        IWaveContract(requestToRequester[requestId]).fulfillRaffle(_qrngUint256Array);
+        IWaveContract(requestToRequester[requestId]).fulfillRaffle(_qrngUint256);
     }
 }
