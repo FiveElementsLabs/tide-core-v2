@@ -25,7 +25,6 @@ interface IWaveFactory {
         uint256 _startTimestamp,
         uint256 _endTimestamp,
         bool _isSoulbound,
-        bool _isRaffle,
         IWaveFactory.TokenRewards memory _tokenRewards
     ) external;
 

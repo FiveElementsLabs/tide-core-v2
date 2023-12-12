@@ -33,7 +33,7 @@ contract WaveContract is ERC2771Context, Ownable, ERC721, SignatureVerifier, IWa
 
     IWaveFactory.TokenRewards public tokenRewards;
 
-    error OnlyRaffleManager();
+    error OnlyRaffleFulfillers();
     error OnlyAuthorized();
     error OnlyGovernance();
     error InvalidTimings();
@@ -65,8 +65,10 @@ contract WaveContract is ERC2771Context, Ownable, ERC721, SignatureVerifier, IWa
         _;
     }
 
-    modifier onlyRaffleManager() {
-        if (_msgSender() != factory.raffleManager()) revert OnlyRaffleManager();
+    modifier onlyRaffleFulfillers() {
+        if (_msgSender() != factory.raffleManager() && _msgSender() != factory.keeper() && _msgSender() != owner()) {
+            revert OnlyRaffleFulfillers();
+        }
         _;
     }
 
@@ -103,6 +105,7 @@ contract WaveContract is ERC2771Context, Ownable, ERC721, SignatureVerifier, IWa
         isSoulbound = _isSoulbound;
         tokenRewards = _tokenRewards;
 
+        if (_tokenRewards.token != address(0)) isERC20Campaign = true;
         mintsPerClaim = 1;
         shouldVerifySignature = true;
     }
@@ -130,8 +133,12 @@ contract WaveContract is ERC2771Context, Ownable, ERC721, SignatureVerifier, IWa
         shouldVerifySignature = !shouldVerifySignature;
     }
 
+    /// @dev toggle the `isERC20Campaign` boolean
+    function toggleIsERC20Campaign() public onlyGovernance {
+        isERC20Campaign = !isERC20Campaign;
+    }
+
     /// @dev change the number of mints per claim with the specified number
-    /// usually used for testing purposes
     function setMintsPerClaim(uint256 _mintsPerClaim) public onlyGovernance {
         mintsPerClaim = _mintsPerClaim;
     }
@@ -172,7 +179,7 @@ contract WaveContract is ERC2771Context, Ownable, ERC721, SignatureVerifier, IWa
             _mintBadge(_msgSender());
         }
 
-        _emitERC20Rewards(_msgSender());
+        if (isERC20Campaign && !tokenRewards.isRaffle) _emitERC20Rewards(_msgSender());
     }
 
     /// @inheritdoc IWaveContract
@@ -184,7 +191,7 @@ contract WaveContract is ERC2771Context, Ownable, ERC721, SignatureVerifier, IWa
     }
 
     /// @inheritdoc IWaveContract
-    function fulfillRaffle(uint256 randomNumber) public onlyEnded onlyRaffleManager {
+    function fulfillRaffle(uint256 randomNumber) public onlyEnded onlyRaffleFulfillers {
         require(!raffleCompleted, "Raffle already done");
         address tokenAddress = tokenRewards.token;
         uint256 amountPerUser = tokenRewards.amountPerUser;

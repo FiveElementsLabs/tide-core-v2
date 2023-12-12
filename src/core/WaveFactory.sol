@@ -58,7 +58,6 @@ contract WaveFactory is Ownable, IWaveFactory {
         uint256 _startTimestamp,
         uint256 _endTimestamp,
         bool _isSoulbound,
-        bool _isRaffle,
         IWaveFactory.TokenRewards memory _tokenRewards
     ) public {
         WaveContract wave = new WaveContract(
@@ -68,7 +67,6 @@ contract WaveFactory is Ownable, IWaveFactory {
             _startTimestamp,
             _endTimestamp,
             _isSoulbound,
-            _isRaffle,
             trustedForwarder,
             _tokenRewards
         );
@@ -76,11 +74,13 @@ contract WaveFactory is Ownable, IWaveFactory {
         waves.push(address(wave));
         wave.transferOwnership(msg.sender);
 
-        if (_isRaffle) {
+        if (_tokenRewards.isRaffle) {
             isRaffleWave[address(wave)] = true;
         }
 
-        _initiateRewards(_tokenRewards, address(wave));
+        if (_tokenRewards.token != address(0)) {
+            _initiateRewards(_tokenRewards, address(wave));
+        }
 
         emit WaveCreated(address(wave), msg.sender);
     }

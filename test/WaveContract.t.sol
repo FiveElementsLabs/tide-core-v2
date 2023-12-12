@@ -24,6 +24,8 @@ contract WaveTest is Test, Helpers {
     IWaveFactory.TokenRewards tokenRewards;
     mapping(bytes32 => bool) tokenIdToHasWon;
 
+    IWaveFactory.TokenRewards EMPTY_TOKEN_REWARDS = IWaveFactory.TokenRewards(0, 0, address(0), false);
+
     uint256 constant CAMPAIGN_DURATION = 100;
     uint256 constant VERIFIER_PRIVATE_KEY = 69420;
     uint256 constant REWARD_AMOUNT_PER_USER = 20;
@@ -61,7 +63,7 @@ contract WaveTest is Test, Helpers {
 
     function test_EndCampaign() public {
         _factory.deployWave(
-            "test", "T", "https://test.com", block.timestamp, block.timestamp + 100, false, false, tokenRewards
+            "test", "T", "https://test.com", block.timestamp, block.timestamp + 100, false, EMPTY_TOKEN_REWARDS
         );
         _wave = WaveContract(_factory.waves(0));
         uint256 endTimestamp = block.timestamp + CAMPAIGN_DURATION / 2;
@@ -138,18 +140,20 @@ contract WaveTest is Test, Helpers {
     }
 
     function _initiateBasicWave() internal {
-        _factory.deployWave("test", "T", "https://test.com", block.timestamp, block.timestamp + 100, false, false, []);
+        _factory.deployWave(
+            "test", "T", "https://test.com", block.timestamp, block.timestamp + 100, false, EMPTY_TOKEN_REWARDS
+        );
 
         _wave = WaveContract(_factory.waves(0));
     }
 
     function _initiateFCFSWave(uint256 rewardsCount, uint256 rewardAmountPerUser) internal {
-        tokenRewards = IWaveFactory.TokenRewards(rewardsCount, rewardAmountPerUser, address(DAI));
+        tokenRewards = IWaveFactory.TokenRewards(rewardsCount, rewardAmountPerUser, address(DAI), false);
         DAI.approve(address(_factory), 1 ether);
         WETH.approve(address(_factory), 1 ether);
 
         _factory.deployWave(
-            "test", "T", "https://test.com", block.timestamp, block.timestamp + 100, false, false, tokenRewards
+            "test", "T", "https://test.com", block.timestamp, block.timestamp + 100, false, tokenRewards
         );
 
         _wave = WaveContract(_factory.waves(0));
@@ -158,11 +162,11 @@ contract WaveTest is Test, Helpers {
     }
 
     function _initiateRaffleWave(uint256 rewardsCount, uint256 rewardAmountPerUser) internal {
-        tokenRewards = IWaveFactory.TokenRewards(rewardsCount, rewardAmountPerUser, address(DAI));
+        tokenRewards = IWaveFactory.TokenRewards(rewardsCount, rewardAmountPerUser, address(DAI), true);
         DAI.approve(address(_factory), 1 ether);
 
         _factory.deployWave(
-            "test", "T", "https://test.com", block.timestamp, block.timestamp + 100, false, true, tokenRewards
+            "test", "T", "https://test.com", block.timestamp, block.timestamp + 100, false, tokenRewards
         );
         _wave = WaveContract(_factory.waves(0));
         assertEq(DAI.balanceOf(address(_wave)), rewardsCount * rewardAmountPerUser);
