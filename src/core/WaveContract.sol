@@ -49,7 +49,7 @@ contract WaveContract is ERC2771Context, Ownable, ERC721, SignatureVerifier, IWa
     event RaffleStarted(address indexed user);
     event RaffleCompleted();
     event CampaignForceEnded();
-    event FundsWithdrawn();
+    event FundsWithdrawn(address indexed token, uint256 indexed amount);
 
     modifier onlyGovernance() {
         if (_msgSender() != factory.keeper()) {
@@ -163,7 +163,6 @@ contract WaveContract is ERC2771Context, Ownable, ERC721, SignatureVerifier, IWa
             );
         }
         _returnTokenToOwner(IERC20(tokenRewards.token));
-        emit FundsWithdrawn();
     }
 
     /// @inheritdoc IWaveContract
@@ -173,13 +172,17 @@ contract WaveContract is ERC2771Context, Ownable, ERC721, SignatureVerifier, IWa
         }
         if (block.timestamp > deadline) revert PermitDeadlineExpired();
 
-        if (shouldVerifySignature) _verifySignature(_msgSender(), deadline, v, r, s, factory.verifier());
+        if (shouldVerifySignature) {
+            _verifySignature(_msgSender(), deadline, v, r, s, factory.verifier());
+        }
 
         for (uint256 i = 0; i < mintsPerClaim; i++) {
             _mintBadge(_msgSender());
         }
 
-        if (isERC20Campaign && !tokenRewards.isRaffle) _emitERC20Rewards(_msgSender());
+        if (isERC20Campaign && !tokenRewards.isRaffle) {
+            _emitERC20Rewards(_msgSender());
+        }
     }
 
     /// @inheritdoc IWaveContract
@@ -211,7 +214,7 @@ contract WaveContract is ERC2771Context, Ownable, ERC721, SignatureVerifier, IWa
             for (uint256 assigned = 0; assigned < rewardsLeft; assigned++) {
                 uint256 tokenId;
                 do {
-                    tokenId = uint256(keccak256(abi.encodePacked(randomNumber, counter))) % lastId + 1;
+                    tokenId = (uint256(keccak256(abi.encodePacked(randomNumber, counter))) % lastId) + 1;
                     counter++;
                 } while (tokenIdToHasWon[tokenId]);
 
@@ -288,6 +291,8 @@ contract WaveContract is ERC2771Context, Ownable, ERC721, SignatureVerifier, IWa
         if (balance != 0) {
             token.transfer(owner(), balance);
         }
+
+        emit FundsWithdrawn(address(token), balance);
     }
 
     function _isGovernance() internal view returns (bool) {
