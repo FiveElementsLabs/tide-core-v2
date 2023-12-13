@@ -188,6 +188,8 @@ contract WaveContract is ERC2771Context, Ownable, ERC721, SignatureVerifier, IWa
     /// @inheritdoc IWaveContract
     function startRaffle() public onlyEnded {
         require(!raffleCompleted, "Raffle already done");
+        require(tokenRewards.isRaffle, "Not a raffle wave");
+
         emit RaffleStarted(_msgSender());
         address raffleManager = factory.raffleManager();
         IRaffleManager(raffleManager).makeRequestUint256();
