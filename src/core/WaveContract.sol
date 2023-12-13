@@ -128,14 +128,14 @@ contract WaveContract is ERC2771Context, Ownable, ERC721, SignatureVerifier, IWa
         endTimestamp = _endTimestamp;
     }
 
-    /// @dev toggle the `shouldVerifySignature` boolean
-    function toggleVerifySignature() public onlyGovernance {
-        shouldVerifySignature = !shouldVerifySignature;
+    /// @dev set the `shouldVerifySignature` boolean
+    function setVerifySignature(bool _shouldVerifySignature) public onlyGovernance {
+        shouldVerifySignature = _shouldVerifySignature;
     }
 
-    /// @dev toggle the `isERC20Campaign` boolean
-    function toggleIsERC20Campaign() public onlyGovernance {
-        isERC20Campaign = !isERC20Campaign;
+    /// @dev set the `isERC20Campaign` boolean
+    function setIsERC20Campaign(bool _isERC20Campaign) public onlyGovernance {
+        isERC20Campaign = _isERC20Campaign;
     }
 
     /// @dev change the number of mints per claim with the specified number
