@@ -91,6 +91,59 @@ contract WaveTest is Test, Helpers {
         _claim(charlie, _wave, CampaignNotActive.selector);
     }
 
+    function test_qualifyTokenIds_1() public {
+        uint256 rewardsCount = 4;
+        _initiateRaffleWave(rewardsCount, REWARD_AMOUNT_PER_USER);
+
+        assertEq(_wave.disqualifiedTokenIdsCount(), 0);
+
+        address[] memory addresses = new address[](20);
+        for (uint256 i = 0; i < addresses.length; i++) {
+            addresses[i] = vm.addr(i + 1);
+            _claim(addresses[i], _wave, bytes4(0));
+        }
+
+        // disqualify address[0], address[1]
+        uint256[] memory disqualifiedIds = new uint256[](2);
+        disqualifiedIds[0] = 1;
+        disqualifiedIds[1] = 2;
+        bool areDisqualified = true;
+        _wave.qualifyTokenIds(disqualifiedIds, areDisqualified);
+        assertEq(_wave.disqualifiedTokenIdsCount(), 2);
+
+        // requalify tokenId 1
+        uint256[] memory requalifiedIds = new uint256[](1);
+        requalifiedIds[0] = 1;
+        areDisqualified = false;
+        _wave.qualifyTokenIds(requalifiedIds, areDisqualified);
+        assertEq(_wave.disqualifiedTokenIdsCount(), 1);
+
+        // fulfill raffle and verify
+        vm.warp(block.timestamp + CAMPAIGN_DURATION + 1);
+        _wave.fulfillRaffle(0);
+        uint256 totalBalanceRaffled = 0;
+        uint256 totalWinners = 0;
+
+        for (uint256 i = 0; i < addresses.length; i++) {
+            uint256 balance = DAI.balanceOf(addresses[i]);
+            if (balance > 0) {
+                totalWinners++;
+                assertEq(balance, REWARD_AMOUNT_PER_USER);
+                totalBalanceRaffled += balance;
+            }
+        }
+
+        if (addresses.length <= rewardsCount) {
+            assertEq(totalWinners, addresses.length);
+        } else {
+            assertEq(totalWinners, rewardsCount);
+        }
+
+        assertEq(totalBalanceRaffled, REWARD_AMOUNT_PER_USER * totalWinners);
+
+        assertEq(DAI.balanceOf(address(this)), 1 ether - totalBalanceRaffled);
+    }
+
     /// @dev number of claims <= number of rewards
     function test_RaffleWithRewards_1() public {
         uint256 rewardsCount = 2;

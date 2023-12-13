@@ -30,6 +30,8 @@ contract WaveContract is ERC2771Context, Ownable, ERC721, SignatureVerifier, IWa
 
     mapping(address => bool) _claimed;
     mapping(uint256 => bool) public tokenIdToHasWon;
+    mapping(uint256 => bool) public tokenIdToDisqualified;
+    uint256 public disqualifiedTokenIdsCount;
 
     IWaveFactory.TokenRewards public tokenRewards;
 
@@ -165,6 +167,29 @@ contract WaveContract is ERC2771Context, Ownable, ERC721, SignatureVerifier, IWa
         _returnTokenToOwner(IERC20(tokenRewards.token));
     }
 
+    /// @notice allow to disqualify or requalify the `tokenIds` to win raffle rewards
+    /// @param tokenIds the token ids to disqualify or requalify
+    /// @param areDisqualified whether `tokenIds` should be disqualified or requalified
+    function qualifyTokenIds(uint256[] calldata tokenIds, bool areDisqualified) public onlyAuthorized {
+        require(tokenRewards.isRaffle, "Can qualify token ids only if raffle wave");
+        uint256 qualifiedUsersCount;
+
+        for (uint256 i = 0; i < tokenIds.length; i++) {
+            uint256 tokenId = tokenIds[i];
+            require(tokenId != 0 && tokenId <= lastId, "Invalid tokenId to qualify");
+            // @dev increment the counter only if
+            // the tokenId is not alredy set with the right qualification
+            if (!tokenIdToDisqualified[tokenId] == areDisqualified) {
+                tokenIdToDisqualified[tokenId] = areDisqualified;
+                qualifiedUsersCount++;
+            }
+        }
+
+        disqualifiedTokenIdsCount = areDisqualified
+            ? disqualifiedTokenIdsCount + qualifiedUsersCount
+            : disqualifiedTokenIdsCount - qualifiedUsersCount;
+    }
+
     /// @inheritdoc IWaveContract
     function claim(uint256 deadline, uint8 v, bytes32 r, bytes32 s) public virtual onlyActive {
         if (_claimed[_msgSender()]) {
@@ -202,30 +227,26 @@ contract WaveContract is ERC2771Context, Ownable, ERC721, SignatureVerifier, IWa
         uint256 amountPerUser = tokenRewards.amountPerUser;
         uint256 rewardsLeft = tokenRewards.rewardsLeft;
 
+        uint256 eligibleTokenIdsCount = lastId - disqualifiedTokenIdsCount;
+        uint256 rewardsToAssign = eligibleTokenIdsCount < rewardsLeft ? eligibleTokenIdsCount : rewardsLeft;
+
         IERC20 token = IERC20(tokenAddress);
 
         uint256 counter = 0;
 
-        if (lastId <= rewardsLeft) {
-            for (uint256 tokenId = 1; tokenId <= lastId; tokenId++) {
-                address winner = ownerOf(tokenId);
-                token.transfer(winner, amountPerUser);
-                emit RaffleWon(winner, tokenAddress, amountPerUser);
-            }
-        } else {
-            for (uint256 assigned = 0; assigned < rewardsLeft; assigned++) {
-                uint256 tokenId;
-                do {
-                    tokenId = (uint256(keccak256(abi.encodePacked(randomNumber, counter))) % lastId) + 1;
-                    counter++;
-                } while (tokenIdToHasWon[tokenId]);
+        for (uint256 assigned = 0; assigned < rewardsToAssign; assigned++) {
+            uint256 tokenId;
+            do {
+                tokenId = (uint256(keccak256(abi.encodePacked(randomNumber, counter))) % lastId) + 1;
+                counter++;
+                // @dev skip disqualified users
+                if (tokenIdToDisqualified[tokenId]) continue;
+            } while (tokenIdToHasWon[tokenId]);
 
-                tokenIdToHasWon[tokenId] = true;
-
-                address winner = ownerOf(tokenId);
-                token.transfer(winner, amountPerUser);
-                emit RaffleWon(winner, tokenAddress, amountPerUser);
-            }
+            tokenIdToHasWon[tokenId] = true;
+            address winner = ownerOf(tokenId);
+            token.transfer(winner, amountPerUser);
+            emit RaffleWon(winner, tokenAddress, amountPerUser);
         }
 
         raffleCompleted = true;
