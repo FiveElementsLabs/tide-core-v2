@@ -15,6 +15,7 @@ interface IRaffleManager {
     ) external;
 
     /// @notice Requests a `uint256`
+    /// @return requestId the 32 bytes of the request id
     function makeRequestUint256() external returns (bytes32 requestId);
 
     /// @notice Called by the Airnode through the AirnodeRrp contract to

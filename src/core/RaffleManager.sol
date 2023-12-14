@@ -4,9 +4,10 @@ pragma solidity 0.8.21;
 import "lib/airnode/packages/airnode-protocol/contracts/rrp/requesters/RrpRequesterV0.sol";
 import {IWaveFactory} from "../interfaces/IWaveFactory.sol";
 import {IWaveContract} from "../interfaces/IWaveContract.sol";
+import {IRaffleManager} from "../interfaces/IRaffleManager.sol";
 import {Ownable} from "lib/openzeppelin-contracts/contracts/access/Ownable.sol";
 
-contract RaffleManager is RrpRequesterV0, Ownable {
+contract RaffleManager is RrpRequesterV0, Ownable, IRaffleManager {
     event RequestedUint256(bytes32 indexed requestId);
     event ReceivedUint256(bytes32 indexed requestId, uint256 response);
 
@@ -52,7 +53,7 @@ contract RaffleManager is RrpRequesterV0, Ownable {
         sponsorWallet = _sponsorWallet;
     }
 
-    /// @notice Requests a `uint256`
+    /// @inheritdoc IRaffleManager
     function makeRequestUint256() external onlyRaffleWave returns (bytes32 requestId) {
         requestId = airnodeRrp.makeFullRequest(
             airnode, endpointIdUint256Array, sponsor, sponsorWallet, address(this), this.fulfillUint256.selector, ""
@@ -69,9 +70,9 @@ contract RaffleManager is RrpRequesterV0, Ownable {
     function fulfillUint256(bytes32 requestId, bytes calldata data) external onlyAirnodeRrp {
         require(expectingRequestWithIdToBeFulfilled[requestId], "Request ID not known");
         expectingRequestWithIdToBeFulfilled[requestId] = false;
-        uint256 _qrngUint256 = abi.decode(data, (uint256));
-        emit ReceivedUint256(requestId, _qrngUint256);
+        uint256 qrngUint256 = abi.decode(data, (uint256));
+        emit ReceivedUint256(requestId, qrngUint256);
 
-        IWaveContract(requestToRequester[requestId]).fulfillRaffle(_qrngUint256);
+        IWaveContract(requestToRequester[requestId]).fulfillRaffle(qrngUint256);
     }
 }
