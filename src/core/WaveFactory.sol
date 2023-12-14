@@ -50,15 +50,7 @@ contract WaveFactory is Ownable, IWaveFactory {
         raffleManager = _raffleManager;
     }
 
-    /// @notice deploys a new campaign
-    /// @param _name name of the campaign
-    /// @param _symbol symbol of the campaign
-    /// @param _baseURI base URI of the ERC-721 metadata
-    /// @param _startTimestamp start timestamp of the campaign
-    /// @param _endTimestamp end timestamp of the campaign
-    /// @param _isSoulbound whether the wave badges will be soulbound
-    /// @param _claimRewards array of claim rewards
-    /// @param _raffleRewards array of raffle rewards
+    /// @inheritdoc IWaveFactory
     function deployWave(
         string memory _name,
         string memory _symbol,
@@ -66,13 +58,8 @@ contract WaveFactory is Ownable, IWaveFactory {
         uint256 _startTimestamp,
         uint256 _endTimestamp,
         bool _isSoulbound,
-        IWaveFactory.TokenRewards[] memory _claimRewards,
-        IWaveFactory.TokenRewards[] memory _raffleRewards
-    ) public override {
-        if (_claimRewards.length >= 2 ** 8 || _raffleRewards.length >= 2 ** 8) {
-            revert TooManyRewards();
-        }
-
+        IWaveFactory.TokenRewards memory _tokenRewards
+    ) public {
         WaveContract wave = new WaveContract(
             _name,
             _symbol,
@@ -81,19 +68,19 @@ contract WaveFactory is Ownable, IWaveFactory {
             _endTimestamp,
             _isSoulbound,
             trustedForwarder,
-            _claimRewards,
-            _raffleRewards
+            _tokenRewards
         );
 
         waves.push(address(wave));
         wave.transferOwnership(msg.sender);
 
-        if (_raffleRewards.length > 0) {
+        if (_tokenRewards.isRaffle) {
             isRaffleWave[address(wave)] = true;
         }
 
-        _initiateRewards(_claimRewards, address(wave));
-        _initiateRewards(_raffleRewards, address(wave));
+        if (_tokenRewards.token != address(0)) {
+            _initiateRewards(_tokenRewards, address(wave));
+        }
 
         emit WaveCreated(address(wave), msg.sender);
     }
@@ -101,13 +88,9 @@ contract WaveFactory is Ownable, IWaveFactory {
     /// @notice funds the campaign with the specified token rewards
     /// @param _tokenRewards array of token rewards
     /// @param wave address of the campaign
-    function _initiateRewards(IWaveFactory.TokenRewards[] memory _tokenRewards, address wave) internal {
-        uint8 len = uint8(_tokenRewards.length);
-
-        for (uint8 i = 0; i < len; ++i) {
-            IERC20(_tokenRewards[i].token).transferFrom(
-                msg.sender, wave, _tokenRewards[i].amountPerUser * _tokenRewards[i].rewardsLeft
-            );
-        }
+    function _initiateRewards(IWaveFactory.TokenRewards memory _tokenRewards, address wave) internal {
+        IERC20(_tokenRewards.token).transferFrom(
+            msg.sender, wave, _tokenRewards.amountPerUser * _tokenRewards.rewardsLeft
+        );
     }
 }
