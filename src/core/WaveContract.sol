@@ -18,7 +18,7 @@ contract WaveContract is ERC2771Context, Ownable, ERC721, SignatureVerifier, IWa
     uint256 public lastId;
     uint256 public startTimestamp;
     uint256 public endTimestamp;
-    uint256 public mintsPerClaim;
+    uint256 public mintsPerClaim = 1;
 
     string _metadataBaseURI;
 
@@ -26,7 +26,7 @@ contract WaveContract is ERC2771Context, Ownable, ERC721, SignatureVerifier, IWa
     bool public isSoulbound;
     bool public isERC20Campaign;
     bool public raffleCompleted;
-    bool public shouldVerifySignature;
+    bool public shouldVerifySignature = true;
 
     mapping(address => bool) _claimed;
     mapping(uint256 => bool) public tokenIdToHasWon;
@@ -108,8 +108,6 @@ contract WaveContract is ERC2771Context, Ownable, ERC721, SignatureVerifier, IWa
         tokenRewards = _tokenRewards;
 
         if (_tokenRewards.token != address(0)) isERC20Campaign = true;
-        mintsPerClaim = 1;
-        shouldVerifySignature = true;
     }
 
     /// @inheritdoc IWaveContract
