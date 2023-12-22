@@ -36,6 +36,12 @@ contract RaffleManager is RrpRequesterV0, Ownable, IRaffleManager {
         waveFactory = _waveFactory;
     }
 
+    /// @dev allows the governance to change the wave factory
+    function setWaveFactory(address _waveFactory) public {
+        require(waveFactory.keeper() == msg.sender, "Only governance can change the wave factory");
+        waveFactory = IWaveFactory(_waveFactory);
+    }
+
     /// @notice Sets parameters used in requesting QRNG services
     /// @param _airnode Airnode address
     /// @param _endpointIdUint256Array Endpoint ID used to request a `uint256[]`
