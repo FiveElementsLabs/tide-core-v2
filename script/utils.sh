@@ -1,10 +1,10 @@
 # create and verify contract
-forge create --rpc-url rpcUrl \
-    --constructor-args $(cast abi-encode "constructor(string,(uint256,string)[])" "Example" "[(1000,example)]") \
+source .env && forge create --rpc-url "https://polygon.llamarpc.com" \
+  --constructor-args 0xa0AD79D995DdeeB18a14eAef56A549A04e3Aa1Bd 0xCFb140930c5eF56d1c154eE865c7AC12E5EcB18b \ 
     --private-key $PRIVATE_KEY \
-    --etherscan-api-key $ETHERSCAN_API_KEY \
+    --etherscan-api-key SNTIKT5HBS3WKWCW2GYAQN1NBU412UZUZW \
     --verify \
-    contractPath
+    src/core/RaffleManager.sol:RaffleManager
 
 # verify already deployed contract
 forge verify-contract \

@@ -12,7 +12,7 @@ contract RaffleManager is RrpRequesterV0, Ownable, IRaffleManager {
     event ReceivedUint256(bytes32 indexed requestId, uint256 response);
 
     address public airnode;
-    bytes32 public endpointIdUint256Array;
+    bytes32 public endpointIdUint256;
     address public sponsor;
     address public sponsorWallet;
 
@@ -44,17 +44,17 @@ contract RaffleManager is RrpRequesterV0, Ownable, IRaffleManager {
 
     /// @notice Sets parameters used in requesting QRNG services
     /// @param _airnode Airnode address
-    /// @param _endpointIdUint256Array Endpoint ID used to request a `uint256[]`
+    /// @param _endpointIdUint256 Endpoint ID used to request a `uint256[]`
     /// @param _sponsor address used to sponsor this requester
     /// @param _sponsorWallet Sponsor wallet address, used for gas by Airnode
     function setRequestParameters(
         address _airnode,
-        bytes32 _endpointIdUint256Array,
+        bytes32 _endpointIdUint256,
         address _sponsor,
         address _sponsorWallet
     ) external onlyOwner {
         airnode = _airnode;
-        endpointIdUint256Array = _endpointIdUint256Array;
+        endpointIdUint256 = _endpointIdUint256;
         sponsor = _sponsor;
         sponsorWallet = _sponsorWallet;
     }
@@ -62,7 +62,7 @@ contract RaffleManager is RrpRequesterV0, Ownable, IRaffleManager {
     /// @inheritdoc IRaffleManager
     function makeRequestUint256() external onlyRaffleWave returns (bytes32 requestId) {
         requestId = airnodeRrp.makeFullRequest(
-            airnode, endpointIdUint256Array, sponsor, sponsorWallet, address(this), this.fulfillUint256.selector, ""
+            airnode, endpointIdUint256, sponsor, sponsorWallet, address(this), this.fulfillUint256.selector, ""
         );
         expectingRequestWithIdToBeFulfilled[requestId] = true;
         requestToRequester[requestId] = msg.sender;
