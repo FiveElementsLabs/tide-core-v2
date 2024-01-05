@@ -42,12 +42,7 @@ contract WaveTest is Test, Helpers {
 
     function setUp() public {
         _mockedAirnodeRNG = new MockedAirnodeRNG();
-        _factory = new WaveFactory(
-            address(this),
-            address(0),
-            verifier,
-            address(0)
-        );
+        _factory = new WaveFactory(address(this), address(0), verifier, address(0));
         _raffleManager = new RaffleManager(address(_mockedAirnodeRNG), _factory);
         _factory.changeRaffleManager(address(_raffleManager));
         DAI = new MockedERC20("DAI", "DAI");
@@ -120,7 +115,10 @@ contract WaveTest is Test, Helpers {
 
         // fulfill raffle and verify
         vm.warp(block.timestamp + CAMPAIGN_DURATION + 1);
-        _wave.fulfillRaffle(0);
+        _wave.fulfillRaffle(1);
+        assertEq(_wave.randomNumber(), 1);
+
+        _wave.executeRaffle();
         uint256 totalBalanceRaffled = 0;
         uint256 totalWinners = 0;
 
@@ -263,6 +261,8 @@ contract WaveTest is Test, Helpers {
         _wave.startRaffle();
 
         _mockedAirnodeRNG.fulfillRequest();
+        assert(_wave.randomNumber() > 0);
+        _wave.executeRaffle();
 
         uint256 totalBalanceRaffled = 0;
         uint256 totalWinners = 0;

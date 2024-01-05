@@ -44,7 +44,7 @@ contract RaffleManager is RrpRequesterV0, Ownable, IRaffleManager {
 
     /// @notice Sets parameters used in requesting QRNG services
     /// @param _airnode Airnode address
-    /// @param _endpointIdUint256 Endpoint ID used to request a `uint256[]`
+    /// @param _endpointIdUint256 Endpoint ID used to request a `uint256`
     /// @param _sponsor address used to sponsor this requester
     /// @param _sponsorWallet Sponsor wallet address, used for gas by Airnode
     function setRequestParameters(

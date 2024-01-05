@@ -19,6 +19,7 @@ contract WaveContract is ERC2771Context, Ownable, ERC721, SignatureVerifier, IWa
     uint256 public startTimestamp;
     uint256 public endTimestamp;
     uint256 public mintsPerClaim = 1;
+    uint256 public randomNumber;
 
     string _metadataBaseURI;
 
@@ -219,8 +220,16 @@ contract WaveContract is ERC2771Context, Ownable, ERC721, SignatureVerifier, IWa
     }
 
     /// @inheritdoc IWaveContract
-    function fulfillRaffle(uint256 randomNumber) public onlyEnded onlyRaffleFulfillers {
+    function fulfillRaffle(uint256 _randomNumber) public onlyEnded onlyRaffleFulfillers {
+        require(randomNumber == 0, "Random number has already been extracted");
+        randomNumber = _randomNumber;
+    }
+
+    /// @inheritdoc IWaveContract
+    function executeRaffle() public onlyEnded {
         require(!raffleCompleted, "Raffle already done");
+        require(randomNumber != 0, "Random number was not extracted yet");
+
         address tokenAddress = tokenRewards.token;
         uint256 amountPerUser = tokenRewards.amountPerUser;
         uint256 rewardsLeft = tokenRewards.rewardsLeft;
