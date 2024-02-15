@@ -283,8 +283,8 @@ contract WaveContract is ERC2771Context, Ownable, ERC721, SignatureVerifier, IWa
     /// @dev internal function to mint a reward for a user
     /// @param user The user to mint the reward for
     function _mintBadge(address user) internal {
-        _safeMint(user, ++lastId);
         _claimed[user] = true;
+        _safeMint(user, ++lastId);
         emit Claimed(user, lastId);
     }
 
