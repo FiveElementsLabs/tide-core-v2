@@ -18,6 +18,7 @@ contract WaveContract is ERC2771Context, Ownable, ERC721, SignatureVerifier, IWa
     uint256 public lastId;
     uint256 public startTimestamp;
     uint256 public endTimestamp;
+    uint256 public deployedTimestamp;
     uint256 public mintsPerClaim = 1;
     uint256 public randomNumber;
 
@@ -105,6 +106,7 @@ contract WaveContract is ERC2771Context, Ownable, ERC721, SignatureVerifier, IWa
         _metadataBaseURI = _uri;
         startTimestamp = _startTimestamp;
         endTimestamp = _endTimestamp;
+        deployedTimestamp = block.timestamp;
         isSoulbound = _isSoulbound;
         tokenRewards = _tokenRewards;
 
@@ -125,7 +127,9 @@ contract WaveContract is ERC2771Context, Ownable, ERC721, SignatureVerifier, IWa
 
     /// @inheritdoc IWaveContract
     function setEndTimestamp(uint256 _endTimestamp) public onlyAuthorized {
-        require(_endTimestamp > block.timestamp && _endTimestamp > startTimestamp, "Invalid end timestamp");
+        /// @dev the wave should end before the contract deployment + 1 year and after the start timestamp
+        require(_endTimestamp > block.timestamp && _endTimestamp > startTimestamp 
+        && _endTimestamp < deployedTimestamp + 31536000, "Invalid end timestamp");
         endTimestamp = _endTimestamp;
     }
 
