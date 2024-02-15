@@ -100,7 +100,7 @@ contract WaveContract is ERC2771Context, Ownable2Step, ERC721, SignatureVerifier
         address _trustedForwarder,
         IWaveFactory.TokenRewards memory _tokenRewards
     ) ERC2771Context(_trustedForwarder) Ownable2Step() ERC721(_name, _symbol) SignatureVerifier(_name) {
-        if (_startTimestamp > _endTimestamp || _endTimestamp < block.timestamp) {
+        if (_startTimestamp > _endTimestamp || _endTimestamp < block.timestamp || _startTimestamp < block.timestamp) {
             revert InvalidTimings();
         }
 
