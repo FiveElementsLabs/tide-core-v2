@@ -228,6 +228,7 @@ contract WaveContract is ERC2771Context, Ownable2Step, ERC721, SignatureVerifier
     /// @inheritdoc IWaveContract
     function fulfillRaffle(uint256 _randomNumber) public onlyEnded onlyRaffleFulfillers {
         require(randomNumber == 0, "Random number has already been extracted");
+        require(_randomNumber != 0, "Random number extracted cant be 0");
         randomNumber = _randomNumber;
     }
 
