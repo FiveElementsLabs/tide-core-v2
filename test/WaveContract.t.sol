@@ -226,7 +226,7 @@ contract WaveTest is Test, Helpers {
     function _claim(address user, WaveContract wave, bytes4 errorMessage) internal {
         uint256 balance = wave.balanceOf(user);
         uint256 deadline = wave.endTimestamp();
-        bytes32 digest = wave.getTypedDataHash(SignatureVerifier.Permit(user, deadline));
+        bytes32 digest = wave.getTypedDataHash(SignatureVerifier.Permit(user, deadline, address(wave)));
 
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(VERIFIER_PRIVATE_KEY, _prefixed(digest));
 

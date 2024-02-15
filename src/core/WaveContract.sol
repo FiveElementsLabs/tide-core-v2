@@ -10,9 +10,11 @@ import {IWaveContract} from "../interfaces/IWaveContract.sol";
 import {IRaffleManager} from "../interfaces/IRaffleManager.sol";
 import {ERC721} from "lib/openzeppelin-contracts/contracts/token/ERC721/ERC721.sol";
 import {IERC20} from "lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
+import {ReentrancyGuard} from "lib/openzeppelin-contracts/contracts/security/ReentrancyGuard.sol";
 import {SignatureVerifier} from "../helpers/SignatureVerifier.sol";
 
-contract WaveContract is ERC2771Context, Ownable, ERC721, SignatureVerifier, IWaveContract {
+
+contract WaveContract is ERC2771Context, Ownable, ERC721, SignatureVerifier, ReentrancyGuard, IWaveContract {
     IWaveFactory public factory;
 
     uint256 public lastId;
@@ -230,7 +232,7 @@ contract WaveContract is ERC2771Context, Ownable, ERC721, SignatureVerifier, IWa
     }
 
     /// @inheritdoc IWaveContract
-    function executeRaffle() public onlyEnded {
+    function executeRaffle() public onlyEnded nonReentrant {
         require(!raffleCompleted, "Raffle already done");
         require(randomNumber != 0, "Random number was not extracted yet");
 
