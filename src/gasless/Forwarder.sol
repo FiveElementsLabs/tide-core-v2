@@ -56,6 +56,7 @@ contract Forwarder {
         bytes calldata suffixData,
         bytes calldata sig
     ) public payable returns (bool success, bytes memory ret) {
+        _verifyGas(req);
         _verifyNonce(req);
         _verifySig(req, domainSeparator, requestTypeHash, suffixData, sig);
         _updateNonce(req);
@@ -77,6 +78,14 @@ contract Forwarder {
 
     function _updateNonce(ForwardRequest memory req) internal {
         nonces[req.from]++;
+    }
+
+    function _verifyGas(ForwardRequest memory req) internal view {
+        uint gasForTransfer = 0;
+        if (req.value != 0) {
+            gasForTransfer = 40000;
+        }
+        require(gasleft() * 63 / 64 >= req.gas + gasForTransfer, "insufficient gas");
     }
 
     function registerRequestType(
