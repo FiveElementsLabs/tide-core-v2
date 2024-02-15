@@ -8,6 +8,7 @@ contract SignatureVerifier {
     struct Permit {
         address spender;
         uint256 deadline;
+        address wave;
     }
 
     bytes32 public immutable DOMAIN_SEPARATOR;
@@ -17,7 +18,7 @@ contract SignatureVerifier {
 
     constructor(string memory _name) {
         DOMAIN_SEPARATOR = _computeDomainSeparator(bytes(_name));
-        PERMIT_TYPEHASH = keccak256("Permit(address spender,uint256 deadline)");
+        PERMIT_TYPEHASH = keccak256("Permit(address spender,uint256 deadline,address wave)");
     }
 
     /// @dev reverts if that the message was not signed by the verifier or if the deadline is passed
@@ -31,7 +32,7 @@ contract SignatureVerifier {
         internal
         view
     {
-        bytes32 typedDataHash = getTypedDataHash(Permit(sender, deadline));
+        bytes32 typedDataHash = getTypedDataHash(Permit(sender, deadline, address(this)));
         address recoveredAddress = ecrecover(_prefixed(typedDataHash), v, r, s);
 
         if (recoveredAddress == address(0) || recoveredAddress != verifier) revert InvalidSignature();
