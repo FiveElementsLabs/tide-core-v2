@@ -3,13 +3,6 @@ pragma solidity ^0.8.21;
 pragma abicoder v2;
 
 interface IWaveContract {
-    struct TokenReward {
-        uint256 count;
-        uint256 amount;
-        address token;
-        bool isRaffle;
-    }
-
     /// @notice Allows the governance to set metadata base URI for all tokens
     /// @param _uri The base URI to set
     /// @param _customMetadata Whether the metadata is encoded with tokenId
