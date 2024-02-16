@@ -185,22 +185,22 @@ contract WaveContract is ERC2771Context, Ownable2Step, ERC721, SignatureVerifier
     /// @param areDisqualified whether `tokenIds` should be disqualified or requalified
     function qualifyTokenIds(uint256[] calldata tokenIds, bool areDisqualified) public onlyAuthorized {
         require(tokenRewards.isRaffle, "Can qualify token ids only if raffle wave");
-        uint256 qualifiedUsersCount;
+        uint256 changedUsersCount;
 
         for (uint256 i = 0; i < tokenIds.length; i++) {
             uint256 tokenId = tokenIds[i];
             require(tokenId != 0 && tokenId <= lastId, "Invalid tokenId to qualify");
             // @dev increment the counter only if
             // the tokenId is not alredy set with the right qualification
-            if (!tokenIdToTokenRewardInfo[tokenId].isDisqualified == areDisqualified) {
+            if (tokenIdToTokenRewardInfo[tokenId].isDisqualified != areDisqualified) {
                 tokenIdToTokenRewardInfo[tokenId].isDisqualified = areDisqualified;
-                qualifiedUsersCount++;
+                changedUsersCount++;
             }
         }
 
         disqualifiedTokenIdsCount = areDisqualified
-            ? disqualifiedTokenIdsCount + qualifiedUsersCount
-            : disqualifiedTokenIdsCount - qualifiedUsersCount;
+            ? disqualifiedTokenIdsCount + changedUsersCount
+            : disqualifiedTokenIdsCount - changedUsersCount;
     }
 
     /// @inheritdoc IWaveContract
@@ -269,6 +269,7 @@ contract WaveContract is ERC2771Context, Ownable2Step, ERC721, SignatureVerifier
     }
 
     function withdrawTokenReward(uint256 tokenId) public onlyEnded { 
+        require(isERC20Campaign, "Not an ERC20 campaign");
         require(raffleCompleted, "Raffle not completed yet");
         require(tokenRewards.isRaffle, "Not a raffle wave");
         require(tokenId != 0 && tokenId <= lastId, "Invalid tokenId to withdraw");
