@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0
-pragma solidity ^0.8.21;
+pragma solidity 0.8.21;
 pragma abicoder v2;
 
 import {IERC721} from "../../lib/openzeppelin-contracts/contracts/token/ERC721/IERC721.sol";
