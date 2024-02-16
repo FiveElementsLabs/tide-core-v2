@@ -331,7 +331,7 @@ contract WaveContract is ERC2771Context, Ownable2Step, ERC721, SignatureVerifier
         bool enoughBalance = amountPerUser <= token.balanceOf(address(this));
 
         if (tokenRewards.rewardsLeft != 0 && enoughBalance) {
-            token.transfer(claimer, amountPerUser);
+            token.safeTransfer(claimer, amountPerUser);
             emit FCFSAwarded(claimer, tokenRewards.token, amountPerUser);
             tokenRewards.rewardsLeft--;
         }
@@ -342,7 +342,7 @@ contract WaveContract is ERC2771Context, Ownable2Step, ERC721, SignatureVerifier
     function _returnTokenToOwner(IERC20 token) internal {
         uint256 balance = token.balanceOf(address(this));
         if (balance != 0) {
-            token.transfer(owner(), balance);
+            token.safeTransfer(owner(), balance);
         }
 
         emit FundsWithdrawn(address(token), balance);
