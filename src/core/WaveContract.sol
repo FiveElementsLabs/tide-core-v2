@@ -150,6 +150,7 @@ contract WaveContract is ERC2771Context, Ownable2Step, ERC721, SignatureVerifier
 
     /// @dev set the `isERC20Campaign` boolean
     function setIsERC20Campaign(bool _isERC20Campaign) public onlyGovernance {
+        require(tokenRewards.token != address(0), "Token address not set");
         isERC20Campaign = _isERC20Campaign;
     }
 
@@ -161,6 +162,7 @@ contract WaveContract is ERC2771Context, Ownable2Step, ERC721, SignatureVerifier
     /// @dev change to token rewards parameters
     function setTokenRewards(IWaveFactory.TokenRewards calldata _tokenRewards) public onlyGovernance {
         tokenRewards = _tokenRewards;
+        isERC20Campaign = _tokenRewards.token != address(0);
     }
 
     /// @inheritdoc IWaveContract

@@ -11,54 +11,65 @@ contract Forwarder {
         uint256 value;
         uint256 gas;
         uint256 nonce;
+        uint256 deadline;
         bytes data;
     }
 
     using ECDSA for bytes32;
 
     string public constant GENERIC_PARAMS =
-        "address from,address to,uint256 value,uint256 gas,uint256 nonce,bytes data";
+        "address from,address to,uint256 value,uint256 gas,uint256 nonce,uint256 deadline,bytes data";
+    string public constant ERC712_VERSION = "1";
+    bytes32 public constant EIP712_DOMAIN_TYPEHASH =
+        keccak256(bytes("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"));
+    string public constant CONTRACT_NAME = "TideForwarder";
+    
+    bytes32 public domainSeparator;
 
     mapping(bytes32 => bool) public typeHashes;
 
     // Nonces of senders, used to prevent replay attacks
-    mapping(address => uint256) private nonces;
+    mapping(address => uint256) private _nonces;
 
     // solhint-disable-next-line no-empty-blocks
     receive() external payable {}
 
     function getNonce(address from) public view returns (uint256) {
-        return nonces[from];
+        return _nonces[from];
     }
 
     constructor() public {
         string memory requestType = string(
             abi.encodePacked("ForwardRequest(", GENERIC_PARAMS, ")")
         );
-        registerRequestTypeInternal(requestType);
+        _registerRequestTypeInternal(requestType);
+        _initializeDomainSeparator();
     }
 
     function verify(
         ForwardRequest memory req,
-        bytes32 domainSeparator,
+        bytes32 reqDomainSeparator,
         bytes32 requestTypeHash,
         bytes calldata suffixData,
         bytes calldata sig
     ) public view {
+        _verifyGas(req);
         _verifyNonce(req);
-        _verifySig(req, domainSeparator, requestTypeHash, suffixData, sig);
+        _verifyDeadline(req);
+        _verifySig(req, reqDomainSeparator, requestTypeHash, suffixData, sig);
     }
 
     function execute(
         ForwardRequest memory req,
-        bytes32 domainSeparator,
+        bytes32 reqDomainSeparator,
         bytes32 requestTypeHash,
         bytes calldata suffixData,
         bytes calldata sig
     ) public payable returns (bool success, bytes memory ret) {
         _verifyGas(req);
         _verifyNonce(req);
-        _verifySig(req, domainSeparator, requestTypeHash, suffixData, sig);
+        _verifyDeadline(req);
+        _verifySig(req, reqDomainSeparator, requestTypeHash, suffixData, sig);
         _updateNonce(req);
 
         // solhint-disable-next-line avoid-low-level-calls
@@ -73,11 +84,11 @@ contract Forwarder {
     }
 
     function _verifyNonce(ForwardRequest memory req) internal view {
-        require(nonces[req.from] == req.nonce, "nonce mismatch");
+        require(_nonces[req.from] == req.nonce, "nonce mismatch");
     }
 
     function _updateNonce(ForwardRequest memory req) internal {
-        nonces[req.from]++;
+        _nonces[req.from]++;
     }
 
     function _verifyGas(ForwardRequest memory req) internal view {
@@ -86,6 +97,10 @@ contract Forwarder {
             gasForTransfer = 40000;
         }
         require(gasleft() * 63 / 64 >= req.gas + gasForTransfer, "insufficient gas");
+    }
+
+    function _verifyDeadline(ForwardRequest memory req) internal view {
+        require(req.deadline <= block.timestamp, "Expired deadline"); 
     }
 
     function registerRequestType(
@@ -100,10 +115,10 @@ contract Forwarder {
         string memory requestType = string(
             abi.encodePacked(typeName, "(", GENERIC_PARAMS, ",", typeSuffix)
         );
-        registerRequestTypeInternal(requestType);
+        _registerRequestTypeInternal(requestType);
     }
 
-    function registerRequestTypeInternal(string memory requestType) internal {
+    function _registerRequestTypeInternal(string memory requestType) internal {
         bytes32 requestTypehash = keccak256(bytes(requestType));
         typeHashes[requestTypehash] = true;
         emit RequestTypeRegistered(requestTypehash, string(requestType));
@@ -113,16 +128,17 @@ contract Forwarder {
 
     function _verifySig(
         ForwardRequest memory req,
-        bytes32 domainSeparator,
+        bytes32 reqDomainSeparator,
         bytes32 requestTypeHash,
         bytes memory suffixData,
         bytes memory sig
     ) internal view {
         require(typeHashes[requestTypeHash], "invalid request typehash");
+        require(reqDomainSeparator == domainSeparator, "invalid domain separator");
         bytes32 digest = keccak256(
             abi.encodePacked(
                 "\x19\x01",
-                domainSeparator,
+                reqDomainSeparator,
                 keccak256(_getEncoded(req, requestTypeHash, suffixData))
             )
         );
@@ -133,7 +149,7 @@ contract Forwarder {
         ForwardRequest memory req,
         bytes32 requestTypeHash,
         bytes memory suffixData
-    ) public pure returns (bytes memory) {
+    ) private pure returns (bytes memory) {
         return
             abi.encodePacked(
                 requestTypeHash,
@@ -147,5 +163,24 @@ contract Forwarder {
                 ),
                 suffixData
             );
+    }
+
+    function _initializeDomainSeparator() internal {
+        domainSeparator = keccak256(
+            abi.encode(
+                EIP712_DOMAIN_TYPEHASH,
+                keccak256(bytes(CONTRACT_NAME)),
+                keccak256(bytes(ERC712_VERSION)),
+                _getChainId(),
+                address(this)
+            )
+        );
+    }
+
+    function _getChainId() internal view returns (uint256 id) {
+        assembly {
+            id := chainid()
+        }
+        return id;
     }
 }
