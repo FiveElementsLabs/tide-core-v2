@@ -32,6 +32,7 @@ contract RaffleManager is RrpRequesterV0, Ownable, IRaffleManager {
     /// that will be fulfilled by its sponsor wallet. See the Airnode protocol
     /// docs about sponsorship for more information.
     /// @param _airnodeRrp Airnode RRP contract address
+    /// @param _waveFactory Wave factory contract
     constructor(address _airnodeRrp, IWaveFactory _waveFactory) RrpRequesterV0(_airnodeRrp) Ownable() {
         waveFactory = _waveFactory;
     }
