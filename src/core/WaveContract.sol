@@ -159,12 +159,6 @@ contract WaveContract is ERC2771Context, Ownable2Step, ERC721, SignatureVerifier
         mintsPerClaim = _mintsPerClaim;
     }
 
-    /// @dev change to token rewards parameters
-    function setTokenRewards(IWaveFactory.TokenRewards calldata _tokenRewards) public onlyGovernance {
-        tokenRewards = _tokenRewards;
-        isERC20Campaign = _tokenRewards.token != address(0);
-    }
-
     /// @inheritdoc IWaveContract
     function endCampaign() public onlyActive onlyAuthorized {
         endTimestamp = block.timestamp;
