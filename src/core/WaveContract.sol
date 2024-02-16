@@ -10,12 +10,21 @@ import {IWaveContract} from "../interfaces/IWaveContract.sol";
 import {IRaffleManager} from "../interfaces/IRaffleManager.sol";
 import {ERC721} from "lib/openzeppelin-contracts/contracts/token/ERC721/ERC721.sol";
 import {IERC20} from "lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
+import {SafeERC20} from 'lib/openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol';
 import {ReentrancyGuard} from "lib/openzeppelin-contracts/contracts/security/ReentrancyGuard.sol";
 import {SignatureVerifier} from "../helpers/SignatureVerifier.sol";
 
 
 contract WaveContract is ERC2771Context, Ownable2Step, ERC721, SignatureVerifier, ReentrancyGuard, IWaveContract {
+    using SafeERC20 for IERC20;
+    
     IWaveFactory public factory;
+
+    struct TokenRewardInfo {
+        bool hasWon;
+        bool hasAlreadyClaimed;
+        bool isDisqualified;
+    }
 
     uint256 public lastId;
     uint256 public startTimestamp;
@@ -33,8 +42,7 @@ contract WaveContract is ERC2771Context, Ownable2Step, ERC721, SignatureVerifier
     bool public shouldVerifySignature = true;
 
     mapping(address => bool) _claimed;
-    mapping(uint256 => bool) public tokenIdToHasWon;
-    mapping(uint256 => bool) public tokenIdToDisqualified;
+    mapping(uint256 => TokenRewardInfo) public tokenIdToTokenRewardInfo;
     uint256 public disqualifiedTokenIdsCount;
 
     IWaveFactory.TokenRewards public tokenRewards;
@@ -165,8 +173,8 @@ contract WaveContract is ERC2771Context, Ownable2Step, ERC721, SignatureVerifier
     function withdrawFunds() public onlyEnded {
         if (tokenRewards.isRaffle) {
             require(
-                raffleCompleted || _isGovernance(),
-                "Can withdraw raffle funds only if raffle is completed or governance requested it"
+                !raffleCompleted || _isGovernance(),
+                "Can withdraw raffle funds only if raffle is not completed or governance requested it"
             );
         }
         _returnTokenToOwner(IERC20(tokenRewards.token));
@@ -184,8 +192,8 @@ contract WaveContract is ERC2771Context, Ownable2Step, ERC721, SignatureVerifier
             require(tokenId != 0 && tokenId <= lastId, "Invalid tokenId to qualify");
             // @dev increment the counter only if
             // the tokenId is not alredy set with the right qualification
-            if (!tokenIdToDisqualified[tokenId] == areDisqualified) {
-                tokenIdToDisqualified[tokenId] = areDisqualified;
+            if (!tokenIdToTokenRewardInfo[tokenId].isDisqualified == areDisqualified) {
+                tokenIdToTokenRewardInfo[tokenId].isDisqualified = areDisqualified;
                 qualifiedUsersCount++;
             }
         }
@@ -237,14 +245,10 @@ contract WaveContract is ERC2771Context, Ownable2Step, ERC721, SignatureVerifier
         require(!raffleCompleted, "Raffle already done");
         require(randomNumber != 0, "Random number was not extracted yet");
 
-        address tokenAddress = tokenRewards.token;
-        uint256 amountPerUser = tokenRewards.amountPerUser;
         uint256 rewardsLeft = tokenRewards.rewardsLeft;
 
         uint256 eligibleTokenIdsCount = lastId - disqualifiedTokenIdsCount;
         uint256 rewardsToAssign = eligibleTokenIdsCount < rewardsLeft ? eligibleTokenIdsCount : rewardsLeft;
-
-        IERC20 token = IERC20(tokenAddress);
 
         uint256 counter = 0;
 
@@ -254,18 +258,30 @@ contract WaveContract is ERC2771Context, Ownable2Step, ERC721, SignatureVerifier
                 tokenId = (uint256(keccak256(abi.encodePacked(randomNumber, counter))) % lastId) + 1;
                 counter++;
                 // @dev skip disqualified users
-                if (tokenIdToDisqualified[tokenId]) continue;
-            } while (tokenIdToHasWon[tokenId]);
+                if (tokenIdToTokenRewardInfo[tokenId].isDisqualified) continue;
+            } while (tokenIdToTokenRewardInfo[tokenId].hasWon);
 
-            tokenIdToHasWon[tokenId] = true;
-            address winner = ownerOf(tokenId);
-            token.transfer(winner, amountPerUser);
-            emit RaffleWon(winner, tokenAddress, amountPerUser);
+            tokenIdToTokenRewardInfo[tokenId].hasWon = true;
         }
 
         raffleCompleted = true;
         emit RaffleCompleted();
-        withdrawFunds();
+    }
+
+    function withdrawTokenReward(uint256 tokenId) public onlyEnded { 
+        require(raffleCompleted, "Raffle not completed yet");
+        require(tokenRewards.isRaffle, "Not a raffle wave");
+        require(tokenId != 0 && tokenId <= lastId, "Invalid tokenId to withdraw");
+        address winner = ownerOf(tokenId);
+        require(_msgSender() == winner, "Only token owner can withdraw the reward");
+        require(tokenIdToTokenRewardInfo[tokenId].hasWon, "Token has not won the raffle");
+
+        address tokenAddress = tokenRewards.token;
+        uint256 amountPerUser = tokenRewards.amountPerUser;
+        IERC20 token = IERC20(tokenAddress);
+        token.safeTransfer(winner, amountPerUser);
+
+        emit RaffleWon(winner, tokenAddress, amountPerUser);
     }
 
     /// @notice returns the URI for a given token ID
