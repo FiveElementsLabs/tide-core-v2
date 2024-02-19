@@ -260,7 +260,7 @@ contract WaveContract is ERC2771Context, Ownable2Step, ERC721, SignatureVerifier
                 if (tokenIdToTokenRewardInfo[tokenId].isDisqualified) continue;
             } while (tokenIdToTokenRewardInfo[tokenId].hasWon);
 
-            emit RaffleWon(winner, tokenAddress, amountPerUser);
+            emit RaffleWon(ownerOf(tokenId), tokenRewards.token, tokenRewards.amountPerUser);
             tokenIdToTokenRewardInfo[tokenId].hasWon = true;
         }
 
