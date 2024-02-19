@@ -60,6 +60,7 @@ contract WaveContract is ERC2771Context, Ownable2Step, ERC721, SignatureVerifier
     event Claimed(address indexed user, uint256 indexed tokenId);
     event FCFSAwarded(address indexed user, address indexed token, uint256 amount);
     event RaffleWon(address indexed user, address indexed token, uint256 amount);
+    event RaffleWithdrawn(address indexed user, address indexed token, uint256 amount);
     event RaffleStarted(address indexed user);
     event RaffleCompleted();
     event CampaignForceEnded();
@@ -259,6 +260,7 @@ contract WaveContract is ERC2771Context, Ownable2Step, ERC721, SignatureVerifier
                 if (tokenIdToTokenRewardInfo[tokenId].isDisqualified) continue;
             } while (tokenIdToTokenRewardInfo[tokenId].hasWon);
 
+            emit RaffleWon(winner, tokenAddress, amountPerUser);
             tokenIdToTokenRewardInfo[tokenId].hasWon = true;
         }
 
@@ -280,7 +282,7 @@ contract WaveContract is ERC2771Context, Ownable2Step, ERC721, SignatureVerifier
         IERC20 token = IERC20(tokenAddress);
         token.safeTransfer(winner, amountPerUser);
 
-        emit RaffleWon(winner, tokenAddress, amountPerUser);
+        emit RaffleWithdrawn(winner, tokenAddress, amountPerUser);
     }
 
     /// @notice returns the URI for a given token ID

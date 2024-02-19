@@ -242,5 +242,10 @@ contract WaveTest is Test, Helpers {
         assert(_wave.randomNumber() > 0);
         _wave.executeRaffle();
 
+        for (uint256 i = 0; i < usersCount; i++) {
+            vm.prank(addresses[i]);
+            _wave.withdrawTokenReward(i+1);
+        }
+
     }
 }
