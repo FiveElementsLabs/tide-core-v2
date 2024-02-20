@@ -271,6 +271,7 @@ contract WaveContract is ERC2771Context, Ownable2Step, ERC721, SignatureVerifier
         emit RaffleCompleted();
     }
 
+    /// @inheritdoc IWaveContract
     function withdrawTokenReward(uint256 tokenId) public onlyEnded { 
         require(isERC20Campaign, "Not an ERC20 campaign");
         require(raffleCompleted, "Raffle not completed yet");
