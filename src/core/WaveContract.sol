@@ -1,23 +1,35 @@
 // SPDX-License-Identifier: GPL-2.0
-pragma solidity ^0.8.21;
+pragma solidity 0.8.21;
 pragma abicoder v2;
 
 import {Strings} from "lib/openzeppelin-contracts/contracts/utils/Strings.sol";
-import {Ownable} from "lib/openzeppelin-contracts/contracts/access/Ownable.sol";
+import {Ownable2Step} from "lib/openzeppelin-contracts/contracts/access/Ownable2Step.sol";
 import {ERC2771Context, Context} from "lib/openzeppelin-contracts/contracts/metatx/ERC2771Context.sol";
 import {IWaveFactory} from "../interfaces/IWaveFactory.sol";
 import {IWaveContract} from "../interfaces/IWaveContract.sol";
 import {IRaffleManager} from "../interfaces/IRaffleManager.sol";
 import {ERC721} from "lib/openzeppelin-contracts/contracts/token/ERC721/ERC721.sol";
 import {IERC20} from "lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
+import {SafeERC20} from 'lib/openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol';
+import {ReentrancyGuard} from "lib/openzeppelin-contracts/contracts/security/ReentrancyGuard.sol";
 import {SignatureVerifier} from "../helpers/SignatureVerifier.sol";
 
-contract WaveContract is ERC2771Context, Ownable, ERC721, SignatureVerifier, IWaveContract {
+
+contract WaveContract is ERC2771Context, Ownable2Step, ERC721, SignatureVerifier, ReentrancyGuard, IWaveContract {
+    using SafeERC20 for IERC20;
+    
     IWaveFactory public factory;
+
+    struct TokenRewardInfo {
+        bool hasWon;
+        bool hasAlreadyClaimed;
+        bool isDisqualified;
+    }
 
     uint256 public lastId;
     uint256 public startTimestamp;
     uint256 public endTimestamp;
+    uint256 public deployedTimestamp;
     uint256 public mintsPerClaim = 1;
     uint256 public randomNumber;
 
@@ -30,8 +42,7 @@ contract WaveContract is ERC2771Context, Ownable, ERC721, SignatureVerifier, IWa
     bool public shouldVerifySignature = true;
 
     mapping(address => bool) _claimed;
-    mapping(uint256 => bool) public tokenIdToHasWon;
-    mapping(uint256 => bool) public tokenIdToDisqualified;
+    mapping(uint256 => TokenRewardInfo) public tokenIdToTokenRewardInfo;
     uint256 public disqualifiedTokenIdsCount;
 
     IWaveFactory.TokenRewards public tokenRewards;
@@ -49,6 +60,7 @@ contract WaveContract is ERC2771Context, Ownable, ERC721, SignatureVerifier, IWa
     event Claimed(address indexed user, uint256 indexed tokenId);
     event FCFSAwarded(address indexed user, address indexed token, uint256 amount);
     event RaffleWon(address indexed user, address indexed token, uint256 amount);
+    event RaffleWithdrawn(address indexed user, address indexed token, uint256 amount);
     event RaffleStarted(address indexed user);
     event RaffleCompleted();
     event CampaignForceEnded();
@@ -96,15 +108,21 @@ contract WaveContract is ERC2771Context, Ownable, ERC721, SignatureVerifier, IWa
         bool _isSoulbound,
         address _trustedForwarder,
         IWaveFactory.TokenRewards memory _tokenRewards
-    ) ERC2771Context(_trustedForwarder) Ownable() ERC721(_name, _symbol) SignatureVerifier(_name) {
+    ) ERC2771Context(_trustedForwarder) Ownable2Step() ERC721(_name, _symbol) SignatureVerifier(_name) {
         if (_startTimestamp > _endTimestamp || _endTimestamp < block.timestamp) {
             revert InvalidTimings();
         }
 
         factory = IWaveFactory(_msgSender());
         _metadataBaseURI = _uri;
-        startTimestamp = _startTimestamp;
+
+        if (_startTimestamp < block.timestamp) {
+            startTimestamp = block.timestamp;
+        } else { 
+            startTimestamp = _startTimestamp;
+        }
         endTimestamp = _endTimestamp;
+        deployedTimestamp = block.timestamp;
         isSoulbound = _isSoulbound;
         tokenRewards = _tokenRewards;
 
@@ -125,7 +143,9 @@ contract WaveContract is ERC2771Context, Ownable, ERC721, SignatureVerifier, IWa
 
     /// @inheritdoc IWaveContract
     function setEndTimestamp(uint256 _endTimestamp) public onlyAuthorized {
-        require(_endTimestamp > block.timestamp && _endTimestamp > startTimestamp, "Invalid end timestamp");
+        /// @dev the wave should end before the contract deployment + 1 year and after the start timestamp
+        require(_endTimestamp > block.timestamp && _endTimestamp > startTimestamp 
+        && _endTimestamp < deployedTimestamp + 31536000, "Invalid end timestamp");
         endTimestamp = _endTimestamp;
     }
 
@@ -136,17 +156,13 @@ contract WaveContract is ERC2771Context, Ownable, ERC721, SignatureVerifier, IWa
 
     /// @dev set the `isERC20Campaign` boolean
     function setIsERC20Campaign(bool _isERC20Campaign) public onlyGovernance {
+        require(tokenRewards.token != address(0), "Token address not set");
         isERC20Campaign = _isERC20Campaign;
     }
 
     /// @dev change the number of mints per claim with the specified number
     function setMintsPerClaim(uint256 _mintsPerClaim) public onlyGovernance {
         mintsPerClaim = _mintsPerClaim;
-    }
-
-    /// @dev change to token rewards parameters
-    function setTokenRewards(IWaveFactory.TokenRewards calldata _tokenRewards) public onlyGovernance {
-        tokenRewards = _tokenRewards;
     }
 
     /// @inheritdoc IWaveContract
@@ -159,8 +175,8 @@ contract WaveContract is ERC2771Context, Ownable, ERC721, SignatureVerifier, IWa
     function withdrawFunds() public onlyEnded {
         if (tokenRewards.isRaffle) {
             require(
-                raffleCompleted || _isGovernance(),
-                "Can withdraw raffle funds only if raffle is completed or governance requested it"
+                !raffleCompleted || _isGovernance(),
+                "Can withdraw raffle funds only if raffle is not completed or governance requested it"
             );
         }
         _returnTokenToOwner(IERC20(tokenRewards.token));
@@ -171,22 +187,22 @@ contract WaveContract is ERC2771Context, Ownable, ERC721, SignatureVerifier, IWa
     /// @param areDisqualified whether `tokenIds` should be disqualified or requalified
     function qualifyTokenIds(uint256[] calldata tokenIds, bool areDisqualified) public onlyAuthorized {
         require(tokenRewards.isRaffle, "Can qualify token ids only if raffle wave");
-        uint256 qualifiedUsersCount;
+        uint256 changedUsersCount;
 
         for (uint256 i = 0; i < tokenIds.length; i++) {
             uint256 tokenId = tokenIds[i];
             require(tokenId != 0 && tokenId <= lastId, "Invalid tokenId to qualify");
             // @dev increment the counter only if
             // the tokenId is not alredy set with the right qualification
-            if (!tokenIdToDisqualified[tokenId] == areDisqualified) {
-                tokenIdToDisqualified[tokenId] = areDisqualified;
-                qualifiedUsersCount++;
+            if (tokenIdToTokenRewardInfo[tokenId].isDisqualified != areDisqualified) {
+                tokenIdToTokenRewardInfo[tokenId].isDisqualified = areDisqualified;
+                changedUsersCount++;
             }
         }
 
         disqualifiedTokenIdsCount = areDisqualified
-            ? disqualifiedTokenIdsCount + qualifiedUsersCount
-            : disqualifiedTokenIdsCount - qualifiedUsersCount;
+            ? disqualifiedTokenIdsCount + changedUsersCount
+            : disqualifiedTokenIdsCount - changedUsersCount;
     }
 
     /// @inheritdoc IWaveContract
@@ -222,22 +238,19 @@ contract WaveContract is ERC2771Context, Ownable, ERC721, SignatureVerifier, IWa
     /// @inheritdoc IWaveContract
     function fulfillRaffle(uint256 _randomNumber) public onlyEnded onlyRaffleFulfillers {
         require(randomNumber == 0, "Random number has already been extracted");
+        require(_randomNumber != 0, "Random number extracted cant be 0");
         randomNumber = _randomNumber;
     }
 
     /// @inheritdoc IWaveContract
-    function executeRaffle() public onlyEnded {
+    function executeRaffle() public onlyEnded nonReentrant {
         require(!raffleCompleted, "Raffle already done");
         require(randomNumber != 0, "Random number was not extracted yet");
 
-        address tokenAddress = tokenRewards.token;
-        uint256 amountPerUser = tokenRewards.amountPerUser;
         uint256 rewardsLeft = tokenRewards.rewardsLeft;
 
         uint256 eligibleTokenIdsCount = lastId - disqualifiedTokenIdsCount;
         uint256 rewardsToAssign = eligibleTokenIdsCount < rewardsLeft ? eligibleTokenIdsCount : rewardsLeft;
-
-        IERC20 token = IERC20(tokenAddress);
 
         uint256 counter = 0;
 
@@ -247,18 +260,33 @@ contract WaveContract is ERC2771Context, Ownable, ERC721, SignatureVerifier, IWa
                 tokenId = (uint256(keccak256(abi.encodePacked(randomNumber, counter))) % lastId) + 1;
                 counter++;
                 // @dev skip disqualified users
-                if (tokenIdToDisqualified[tokenId]) continue;
-            } while (tokenIdToHasWon[tokenId]);
+                if (tokenIdToTokenRewardInfo[tokenId].isDisqualified) continue;
+            } while (tokenIdToTokenRewardInfo[tokenId].hasWon);
 
-            tokenIdToHasWon[tokenId] = true;
-            address winner = ownerOf(tokenId);
-            token.transfer(winner, amountPerUser);
-            emit RaffleWon(winner, tokenAddress, amountPerUser);
+            emit RaffleWon(ownerOf(tokenId), tokenRewards.token, tokenRewards.amountPerUser);
+            tokenIdToTokenRewardInfo[tokenId].hasWon = true;
         }
 
         raffleCompleted = true;
         emit RaffleCompleted();
-        withdrawFunds();
+    }
+
+    /// @inheritdoc IWaveContract
+    function withdrawTokenReward(uint256 tokenId) public onlyEnded { 
+        require(isERC20Campaign, "Not an ERC20 campaign");
+        require(raffleCompleted, "Raffle not completed yet");
+        require(tokenRewards.isRaffle, "Not a raffle wave");
+        require(tokenId != 0 && tokenId <= lastId, "Invalid tokenId to withdraw");
+        address winner = ownerOf(tokenId);
+        require(_msgSender() == winner, "Only token owner can withdraw the reward");
+        require(tokenIdToTokenRewardInfo[tokenId].hasWon, "Token has not won the raffle");
+
+        address tokenAddress = tokenRewards.token;
+        uint256 amountPerUser = tokenRewards.amountPerUser;
+        IERC20 token = IERC20(tokenAddress);
+        token.safeTransfer(winner, amountPerUser);
+
+        emit RaffleWithdrawn(winner, tokenAddress, amountPerUser);
     }
 
     /// @notice returns the URI for a given token ID
@@ -283,8 +311,8 @@ contract WaveContract is ERC2771Context, Ownable, ERC721, SignatureVerifier, IWa
     /// @dev internal function to mint a reward for a user
     /// @param user The user to mint the reward for
     function _mintBadge(address user) internal {
-        _safeMint(user, ++lastId);
         _claimed[user] = true;
+        _safeMint(user, ++lastId);
         emit Claimed(user, lastId);
     }
 
@@ -308,7 +336,7 @@ contract WaveContract is ERC2771Context, Ownable, ERC721, SignatureVerifier, IWa
         bool enoughBalance = amountPerUser <= token.balanceOf(address(this));
 
         if (tokenRewards.rewardsLeft != 0 && enoughBalance) {
-            token.transfer(claimer, amountPerUser);
+            token.safeTransfer(claimer, amountPerUser);
             emit FCFSAwarded(claimer, tokenRewards.token, amountPerUser);
             tokenRewards.rewardsLeft--;
         }
@@ -319,7 +347,7 @@ contract WaveContract is ERC2771Context, Ownable, ERC721, SignatureVerifier, IWa
     function _returnTokenToOwner(IERC20 token) internal {
         uint256 balance = token.balanceOf(address(this));
         if (balance != 0) {
-            token.transfer(owner(), balance);
+            token.safeTransfer(owner(), balance);
         }
 
         emit FundsWithdrawn(address(token), balance);
