@@ -18,7 +18,7 @@ contract Forwarder {
     using ECDSA for bytes32;
 
     string public constant GENERIC_PARAMS =
-        "address from,address to,uint256 value,uint256 gas,uint256 nonce,uint256 deadline,bytes data";
+        "address from,address to,uint256 value,uint256 gas,uint256 nonce,bytes data";
     string public constant ERC712_VERSION = "1";
     bytes32 public constant EIP712_DOMAIN_TYPEHASH =
         keccak256(bytes("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"));
@@ -100,7 +100,7 @@ contract Forwarder {
     }
 
     function _verifyDeadline(ForwardRequest memory req) internal view {
-        require(req.deadline <= block.timestamp, "Expired deadline"); 
+        require(block.timestamp <= req.deadline, "Expired deadline"); 
     }
 
     function registerRequestType(

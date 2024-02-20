@@ -116,8 +116,11 @@ contract WaveContract is ERC2771Context, Ownable2Step, ERC721, SignatureVerifier
         factory = IWaveFactory(_msgSender());
         _metadataBaseURI = _uri;
 
-        if(_startTimestamp < block.timestamp) _startTimestamp = block.timestamp;
-        else startTimestamp = _startTimestamp;
+        if (_startTimestamp < block.timestamp) {
+            startTimestamp = block.timestamp;
+        } else { 
+            startTimestamp = _startTimestamp;
+        }
         endTimestamp = _endTimestamp;
         deployedTimestamp = block.timestamp;
         isSoulbound = _isSoulbound;

@@ -7,6 +7,7 @@ import "../lib/forge-std/src/console.sol";
 import "../lib/forge-std/src/StdUtils.sol";
 import "../src/core/WaveContract.sol";
 import "../src/core/WaveFactory.sol";
+import "../src/gasless/Forwarder.sol";
 import "../src/core/RaffleManager.sol";
 import "../src/interfaces/IWaveFactory.sol";
 import "./mocked/MockedERC20.sol";
@@ -242,5 +243,17 @@ contract WaveTest is Test, Helpers {
         assert(_wave.randomNumber() > 0);
         _wave.executeRaffle();
 
+    }
+
+
+    function test_getForwarderDomainSeparator() public {
+        Forwarder _forwarder = new Forwarder();
+        console.logBytes32(_forwarder.domainSeparator());
+        console.log(address(_forwarder));
+        uint256 id;
+            assembly {
+                id := chainid()
+            }
+        console.log(id);
     }
 }
