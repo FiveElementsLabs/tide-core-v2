@@ -245,15 +245,4 @@ contract WaveTest is Test, Helpers {
 
     }
 
-
-    function test_getForwarderDomainSeparator() public {
-        Forwarder _forwarder = new Forwarder();
-        console.logBytes32(_forwarder.domainSeparator());
-        console.log(address(_forwarder));
-        uint256 id;
-            assembly {
-                id := chainid()
-            }
-        console.log(id);
-    }
 }
