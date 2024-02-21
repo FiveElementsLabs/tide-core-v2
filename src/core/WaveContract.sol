@@ -154,12 +154,6 @@ contract WaveContract is ERC2771Context, Ownable2Step, ERC721, SignatureVerifier
         shouldVerifySignature = _shouldVerifySignature;
     }
 
-    /// @dev set the `isERC20Campaign` boolean
-    function setIsERC20Campaign(bool _isERC20Campaign) public onlyGovernance {
-        require(tokenRewards.token != address(0), "Token address not set");
-        isERC20Campaign = _isERC20Campaign;
-    }
-
     /// @dev change the number of mints per claim with the specified number
     function setMintsPerClaim(uint256 _mintsPerClaim) public onlyGovernance {
         mintsPerClaim = _mintsPerClaim;
@@ -243,7 +237,7 @@ contract WaveContract is ERC2771Context, Ownable2Step, ERC721, SignatureVerifier
     }
 
     /// @inheritdoc IWaveContract
-    function executeRaffle() public onlyEnded nonReentrant {
+    function executeRaffle() public onlyEnded {
         require(!raffleCompleted, "Raffle already done");
         require(randomNumber != 0, "Random number was not extracted yet");
 
@@ -272,7 +266,7 @@ contract WaveContract is ERC2771Context, Ownable2Step, ERC721, SignatureVerifier
     }
 
     /// @inheritdoc IWaveContract
-    function withdrawTokenReward(uint256 tokenId) public onlyEnded { 
+    function withdrawTokenReward(uint256 tokenId) public onlyEnded nonReentrant { 
         require(isERC20Campaign, "Not an ERC20 campaign");
         require(raffleCompleted, "Raffle not completed yet");
         require(tokenRewards.isRaffle, "Not a raffle wave");
@@ -280,12 +274,14 @@ contract WaveContract is ERC2771Context, Ownable2Step, ERC721, SignatureVerifier
         address winner = ownerOf(tokenId);
         require(_msgSender() == winner, "Only token owner can withdraw the reward");
         require(tokenIdToTokenRewardInfo[tokenId].hasWon, "Token has not won the raffle");
+        require(tokenIdToTokenRewardInfo[tokenId].hasAlreadyClaimed == false, "Token has already claimed the reward");
 
         address tokenAddress = tokenRewards.token;
         uint256 amountPerUser = tokenRewards.amountPerUser;
         IERC20 token = IERC20(tokenAddress);
         token.safeTransfer(winner, amountPerUser);
 
+        tokenIdToTokenRewardInfo[tokenId].hasAlreadyClaimed = true;
         emit RaffleWithdrawn(winner, tokenAddress, amountPerUser);
     }
 
