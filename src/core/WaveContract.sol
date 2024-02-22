@@ -166,7 +166,7 @@ contract WaveContract is ERC2771Context, Ownable2Step, ERC721, SignatureVerifier
     }
 
     /// @inheritdoc IWaveContract
-    function withdrawFunds() public onlyEnded {
+    function withdrawFunds() public onlyEnded onlyGovernance {
         if (tokenRewards.isRaffle) {
             require(
                 !raffleCompleted || _isGovernance(),
