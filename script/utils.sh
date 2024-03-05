@@ -6,6 +6,9 @@ source .env && forge create --rpc-url "https://polygon.llamarpc.com" \
   --verify \
   src/core/WaveFactory.sol:WaveFactory
 
+# run deploy pipeline
+source .env && forge script script/DeployPipeline.sol --rpc-url $POLYGON_RPC_URL --verify --broadcast -vvvv
+
 # verify already deployed contract
 source .env && forge verify-contract \
     --chain-id 137 \
