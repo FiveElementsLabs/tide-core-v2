@@ -32,10 +32,12 @@ contract WaveTest is Test, Helpers {
     uint256 constant REWARD_AMOUNT_PER_USER = 20;
     uint256 constant REWARDS_COUNT = 2;
     address immutable verifier = vm.addr(VERIFIER_PRIVATE_KEY);
+    address immutable project = vm.addr(999);
     address immutable alice = vm.addr(1000);
     address immutable bob = vm.addr(1001);
     address immutable charlie = vm.addr(1002);
     address immutable dave = vm.addr(1003);
+    bytes32 immutable raffleWonTopic0 = keccak256("RaffleWon(indexed uint256,indexed address,uint256)");
 
     error CampaignNotActive();
     error CampaignNotEnded();
@@ -48,8 +50,8 @@ contract WaveTest is Test, Helpers {
         _factory.changeRaffleManager(address(_raffleManager));
         DAI = new MockedERC20("DAI", "DAI");
         WETH = new MockedERC20("WETH", "WETH");
-        DAI.mint(address(this), 1 ether);
-        WETH.mint(address(this), 1 ether);
+        DAI.mint(project, 1 ether);
+        WETH.mint(project, 1 ether);
     }
 
     function test_ClaimNoRewards() public {
@@ -58,14 +60,12 @@ contract WaveTest is Test, Helpers {
     }
 
     function test_EndCampaign() public {
-        _factory.deployWave(
-            "test", "T", "https://test.com", block.timestamp, block.timestamp + 100, false, EMPTY_TOKEN_REWARDS
-        );
-        _wave = WaveContract(_factory.waves(0));
+        _initiateBasicWave();
         uint256 endTimestamp = block.timestamp + CAMPAIGN_DURATION / 2;
         vm.warp(endTimestamp);
 
         _wave.endCampaign();
+        vm.stopPrank();
         assertEq(_wave.endTimestamp(), endTimestamp);
     }
 
@@ -170,14 +170,18 @@ contract WaveTest is Test, Helpers {
     }
 
     function _initiateBasicWave() internal {
+        vm.startPrank(project);
         _factory.deployWave(
             "test", "T", "https://test.com", block.timestamp, block.timestamp + 100, false, EMPTY_TOKEN_REWARDS
         );
 
         _wave = WaveContract(_factory.waves(0));
+        _wave.acceptOwnership();
+        vm.stopPrank();
     }
 
     function _initiateFCFSWave(uint256 rewardsCount, uint256 rewardAmountPerUser) internal {
+        vm.startPrank(project);
         tokenRewards = IWaveFactory.TokenRewards(rewardsCount, rewardAmountPerUser, address(DAI), false);
         DAI.approve(address(_factory), 1 ether);
         WETH.approve(address(_factory), 1 ether);
@@ -187,11 +191,13 @@ contract WaveTest is Test, Helpers {
         );
 
         _wave = WaveContract(_factory.waves(0));
+        vm.stopPrank();
 
         assertEq(DAI.balanceOf(address(_wave)), rewardsCount * rewardAmountPerUser);
     }
 
     function _initiateRaffleWave(uint256 rewardsCount, uint256 rewardAmountPerUser) internal {
+        vm.startPrank(project);
         tokenRewards = IWaveFactory.TokenRewards(rewardsCount, rewardAmountPerUser, address(DAI), true);
         DAI.approve(address(_factory), 1 ether);
 
@@ -199,6 +205,7 @@ contract WaveTest is Test, Helpers {
             "test", "T", "https://test.com", block.timestamp, block.timestamp + 100, false, tokenRewards
         );
         _wave = WaveContract(_factory.waves(0));
+        vm.stopPrank();
         assertEq(DAI.balanceOf(address(_wave)), rewardsCount * rewardAmountPerUser);
     }
 
@@ -238,11 +245,24 @@ contract WaveTest is Test, Helpers {
 
         vm.warp(block.timestamp + CAMPAIGN_DURATION + 1);
         _wave.startRaffle();
-    
+
         _mockedAirnodeRNG.fulfillRequest();
         assert(_wave.randomNumber() > 0);
+
+        vm.recordLogs();
         _wave.executeRaffle();
+        Vm.Log[] memory entries = vm.getRecordedLogs();
 
+        for (uint256 i = 0; i < entries.length; i++) {
+            if (entries[i].topics[0] != raffleWonTopic0) continue;
+            uint256 winningToken = (uint256(entries[i].topics[1]));
+            address winner = _wave.ownerOf(winningToken);
+
+            uint256 balance = DAI.balanceOf(winner);
+
+            vm.prank(_wave.ownerOf(winningToken));
+            _wave.withdrawTokenReward(winningToken);
+            assertEq(DAI.balanceOf(winner), balance + REWARD_AMOUNT_PER_USER);
+        }
     }
-
 }
