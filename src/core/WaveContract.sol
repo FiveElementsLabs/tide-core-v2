@@ -175,6 +175,8 @@ contract WaveContract is ERC2771Context, Ownable, ERC721, SignatureVerifier, Ree
     function withdrawFunds() public onlyEnded onlyAuthorized {
         IERC20 token = IERC20(tokenRewards.token);
         uint256 amount = token.balanceOf(address(this));
+
+        // after TOKEN_LOCK_TIME, unclaimed tokens become withdrawable by the owner
         if (tokenRewards.isRaffle && block.timestamp < endTimestamp + TOKEN_LOCK_TIME) {
             amount = raffleWithdrawableAmount;
         }
