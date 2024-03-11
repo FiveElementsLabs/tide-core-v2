@@ -3,7 +3,7 @@ pragma solidity 0.8.21;
 pragma abicoder v2;
 
 import {Strings} from "lib/openzeppelin-contracts/contracts/utils/Strings.sol";
-import {Ownable2Step} from "lib/openzeppelin-contracts/contracts/access/Ownable2Step.sol";
+import {Ownable} from "lib/openzeppelin-contracts/contracts/access/Ownable.sol";
 import {ERC2771Context, Context} from "lib/openzeppelin-contracts/contracts/metatx/ERC2771Context.sol";
 import {IWaveFactory} from "../interfaces/IWaveFactory.sol";
 import {IWaveContract} from "../interfaces/IWaveContract.sol";
@@ -14,7 +14,7 @@ import {SafeERC20} from "lib/openzeppelin-contracts/contracts/token/ERC20/utils/
 import {ReentrancyGuard} from "lib/openzeppelin-contracts/contracts/security/ReentrancyGuard.sol";
 import {SignatureVerifier} from "../helpers/SignatureVerifier.sol";
 
-contract WaveContract is ERC2771Context, Ownable2Step, ERC721, SignatureVerifier, ReentrancyGuard, IWaveContract {
+contract WaveContract is ERC2771Context, Ownable, ERC721, SignatureVerifier, ReentrancyGuard, IWaveContract {
     using SafeERC20 for IERC20;
 
     IWaveFactory public factory;
@@ -107,7 +107,7 @@ contract WaveContract is ERC2771Context, Ownable2Step, ERC721, SignatureVerifier
         bool _isSoulbound,
         address _trustedForwarder,
         IWaveFactory.TokenRewards memory _tokenRewards
-    ) ERC2771Context(_trustedForwarder) Ownable2Step() ERC721(_name, _symbol) SignatureVerifier(_name) {
+    ) ERC2771Context(_trustedForwarder) Ownable() ERC721(_name, _symbol) SignatureVerifier(_name) {
         if (_startTimestamp > _endTimestamp || _endTimestamp < block.timestamp) {
             revert InvalidTimings();
         }

@@ -2,12 +2,12 @@
 pragma solidity 0.8.21;
 pragma abicoder v2;
 
-import {Ownable} from "lib/openzeppelin-contracts/contracts/access/Ownable.sol";
+import {Ownable2Step} from "lib/openzeppelin-contracts/contracts/access/Ownable2Step.sol";
 import {WaveContract} from "./WaveContract.sol";
 import {IWaveFactory} from "../interfaces/IWaveFactory.sol";
 import {IERC20} from "lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 
-contract WaveFactory is Ownable, IWaveFactory {
+contract WaveFactory is Ownable2Step, IWaveFactory {
     address[] public waves;
     address public keeper;
     address public trustedForwarder;
@@ -19,7 +19,7 @@ contract WaveFactory is Ownable, IWaveFactory {
 
     event WaveCreated(address indexed wave, address indexed owner);
 
-    constructor(address _keeper, address _trustedForwarder, address _verifier, address _raffleManager) Ownable() {
+    constructor(address _keeper, address _trustedForwarder, address _verifier, address _raffleManager) Ownable2Step() {
         keeper = _keeper;
         trustedForwarder = _trustedForwarder;
         verifier = _verifier;
@@ -61,14 +61,7 @@ contract WaveFactory is Ownable, IWaveFactory {
         IWaveFactory.TokenRewards memory _tokenRewards
     ) public {
         WaveContract wave = new WaveContract(
-            _name,
-            _symbol,
-            _baseURI,
-            _startTimestamp,
-            _endTimestamp,
-            _isSoulbound,
-            trustedForwarder,
-            _tokenRewards
+            _name, _symbol, _baseURI, _startTimestamp, _endTimestamp, _isSoulbound, trustedForwarder, _tokenRewards
         );
 
         waves.push(address(wave));

@@ -140,9 +140,10 @@ contract WaveTest is Test, Helpers {
         _initiateFCFSWave(REWARDS_COUNT, REWARD_AMOUNT_PER_USER);
 
         vm.warp(block.timestamp + CAMPAIGN_DURATION + 1);
+        uint256 balance = DAI.balanceOf(_wave.owner());
         _wave.withdrawFunds();
         assertEq(DAI.balanceOf(address(_wave)), 0);
-        assertEq(DAI.balanceOf(_wave.owner()), 40 wei);
+        assertEq(DAI.balanceOf(_wave.owner()) - balance, REWARDS_COUNT * REWARD_AMOUNT_PER_USER);
     }
 
     function test_WithdrawClaimRewardsFunds() public {
@@ -152,9 +153,10 @@ contract WaveTest is Test, Helpers {
         _wave.withdrawFunds();
 
         vm.warp(block.timestamp + CAMPAIGN_DURATION + 1);
+        uint256 balance = DAI.balanceOf(_wave.owner());
         _wave.withdrawFunds();
         assertEq(DAI.balanceOf(address(_wave)), 0);
-        assertEq(DAI.balanceOf(_wave.owner()), 40 wei);
+        assertEq(DAI.balanceOf(_wave.owner()) - balance, REWARDS_COUNT * REWARD_AMOUNT_PER_USER);
     }
 
     function test_WithdrawOnlyAfterCampaignEnd() public {
@@ -164,9 +166,11 @@ contract WaveTest is Test, Helpers {
         _wave.withdrawFunds();
 
         vm.warp(block.timestamp + CAMPAIGN_DURATION + 1);
+
+        uint256 balance = DAI.balanceOf(_wave.owner());
         _wave.withdrawFunds();
         assertEq(DAI.balanceOf(address(_wave)), 0);
-        assertEq(DAI.balanceOf(_wave.owner()), 40 wei);
+        assertEq(DAI.balanceOf(_wave.owner()) - balance, REWARDS_COUNT * REWARD_AMOUNT_PER_USER);
     }
 
     function _initiateBasicWave() internal {
@@ -176,7 +180,6 @@ contract WaveTest is Test, Helpers {
         );
 
         _wave = WaveContract(_factory.waves(0));
-        _wave.acceptOwnership();
         vm.stopPrank();
     }
 

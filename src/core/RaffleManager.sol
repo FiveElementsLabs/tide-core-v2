@@ -5,9 +5,9 @@ import "lib/airnode/packages/airnode-protocol/contracts/rrp/requesters/RrpReques
 import {IWaveFactory} from "../interfaces/IWaveFactory.sol";
 import {IWaveContract} from "../interfaces/IWaveContract.sol";
 import {IRaffleManager} from "../interfaces/IRaffleManager.sol";
-import {Ownable} from "lib/openzeppelin-contracts/contracts/access/Ownable.sol";
+import {Ownable2Step} from "lib/openzeppelin-contracts/contracts/access/Ownable2Step.sol";
 
-contract RaffleManager is RrpRequesterV0, Ownable, IRaffleManager {
+contract RaffleManager is RrpRequesterV0, Ownable2Step, IRaffleManager {
     event RequestedUint256(bytes32 indexed requestId);
     event ReceivedUint256(bytes32 indexed requestId, uint256 response);
 
@@ -33,7 +33,7 @@ contract RaffleManager is RrpRequesterV0, Ownable, IRaffleManager {
     /// docs about sponsorship for more information.
     /// @param _airnodeRrp Airnode RRP contract address
     /// @param _waveFactory Wave factory contract
-    constructor(address _airnodeRrp, IWaveFactory _waveFactory) RrpRequesterV0(_airnodeRrp) Ownable() {
+    constructor(address _airnodeRrp, IWaveFactory _waveFactory) RrpRequesterV0(_airnodeRrp) Ownable2Step() {
         waveFactory = _waveFactory;
     }
 
