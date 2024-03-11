@@ -31,6 +31,8 @@ contract WaveContract is ERC2771Context, Ownable, ERC721, SignatureVerifier, Ree
     uint256 public deployedTimestamp;
     uint256 public mintsPerClaim = 1;
     uint256 public randomNumber;
+    uint256 public raffleWithdrawableAmount;
+    uint256 public constant TOKEN_LOCK_TIME = 60 * 60 * 24 * 365;
 
     string _metadataBaseURI;
 
@@ -125,7 +127,9 @@ contract WaveContract is ERC2771Context, Ownable, ERC721, SignatureVerifier, Ree
         isSoulbound = _isSoulbound;
         tokenRewards = _tokenRewards;
 
-        if (_tokenRewards.token != address(0)) isERC20Campaign = true;
+        if (_tokenRewards.token != address(0)) {
+            isERC20Campaign = true;
+        }
     }
 
     /// @inheritdoc IWaveContract
@@ -168,14 +172,14 @@ contract WaveContract is ERC2771Context, Ownable, ERC721, SignatureVerifier, Ree
     }
 
     /// @inheritdoc IWaveContract
-    function withdrawFunds() public onlyEnded onlyGovernance {
-        if (tokenRewards.isRaffle) {
-            require(
-                !raffleCompleted || _isGovernance(),
-                "Can withdraw raffle funds only if raffle is not completed or governance requested it"
-            );
+    function withdrawFunds() public onlyEnded onlyAuthorized {
+        IERC20 token = IERC20(tokenRewards.token);
+        uint256 amount = token.balanceOf(address(this));
+        if (tokenRewards.isRaffle && block.timestamp < endTimestamp + TOKEN_LOCK_TIME) {
+            amount = raffleWithdrawableAmount;
         }
-        _returnTokenToOwner(IERC20(tokenRewards.token));
+
+        _returnTokenToOwner(token, amount);
     }
 
     /// @notice allow to disqualify or requalify the `tokenIds` to win raffle rewards
@@ -263,6 +267,11 @@ contract WaveContract is ERC2771Context, Ownable, ERC721, SignatureVerifier, Ree
             tokenIdToTokenRewardInfo[tokenId].hasWon = true;
         }
 
+        uint256 tokenBalance = IERC20(tokenRewards.token).balanceOf(address(this));
+
+        // if there are leftover tokens from rewards assignment, project can withdraw them
+        raffleWithdrawableAmount = tokenBalance - rewardsToAssign * tokenRewards.amountPerUser;
+
         raffleCompleted = true;
         emit RaffleCompleted();
     }
@@ -342,13 +351,11 @@ contract WaveContract is ERC2771Context, Ownable, ERC721, SignatureVerifier, Ree
 
     /// @dev internal function to call when withdrawing funds after campaign is ended
     /// @param token the token address of which balance has to be returned to the owner
-    function _returnTokenToOwner(IERC20 token) internal {
-        uint256 balance = token.balanceOf(address(this));
-        if (balance != 0) {
-            token.safeTransfer(owner(), balance);
+    function _returnTokenToOwner(IERC20 token, uint256 amount) internal {
+        if (amount != 0) {
+            token.safeTransfer(owner(), amount);
         }
-
-        emit FundsWithdrawn(address(token), balance);
+        emit FundsWithdrawn(address(token), amount);
     }
 
     function _isGovernance() internal view returns (bool) {

@@ -173,6 +173,21 @@ contract WaveTest is Test, Helpers {
         assertEq(DAI.balanceOf(_wave.owner()) - balance, REWARDS_COUNT * REWARD_AMOUNT_PER_USER);
     }
 
+    function test_RaffleNoMints() public {
+        _initiateRaffleWave(REWARDS_COUNT, REWARD_AMOUNT_PER_USER);
+        vm.warp(block.timestamp + CAMPAIGN_DURATION + 1);
+
+        _wave.startRaffle();
+        _mockedAirnodeRNG.fulfillRequest();
+        assert(_wave.randomNumber() > 0);
+        _wave.executeRaffle();
+
+        uint256 balance = DAI.balanceOf(_wave.owner());
+        _wave.withdrawFunds();
+        assertEq(DAI.balanceOf(address(_wave)), 0);
+        assertEq(DAI.balanceOf(_wave.owner()) - balance, REWARDS_COUNT * REWARD_AMOUNT_PER_USER);
+    }
+
     function _initiateBasicWave() internal {
         vm.startPrank(project);
         _factory.deployWave(
