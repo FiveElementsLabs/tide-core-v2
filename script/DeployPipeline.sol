@@ -7,7 +7,7 @@ import {WaveFactory} from "../src/core/WaveFactory.sol";
 import {RaffleManager} from "../src/core/RaffleManager.sol";
 import {IAirnodeRrpV0} from "../lib/airnode/packages/airnode-protocol/contracts/rrp/interfaces/IAirnodeRrpV0.sol";
 
-contract DeployMyTokenScript is Script {
+contract DeployPipeline is Script {
     address polygonTrustedForwarder = 0xafA1853E44e547F1A9770Fd37c4556b4Faf54674;
     address verifier = 0x75d14F0Ae59003C0806B625B402a40340Ffde634;
     address airnode = 0x224e030f03Cd3440D88BD78C9BF5Ed36458A1A25;
