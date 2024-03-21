@@ -33,7 +33,10 @@ contract DeployPipeline is Script {
         WaveFactory factory = new WaveFactory(deployerAddress, polygonTrustedForwarder, verifier, address(0));
 
         address rrpAddress;
-        if (getChainID() == 42161) rrpAddress = arbitrumRrp;
+        uint256 chainId = getChainID();
+        if (chainId == 148 || chainId == 1) return;
+
+        if (chainId == 42161) rrpAddress = arbitrumRrp;
         else rrpAddress = airnodeRrp;
 
         IAirnodeRrpV0 airnodeRrpContract = IAirnodeRrpV0(rrpAddress);
