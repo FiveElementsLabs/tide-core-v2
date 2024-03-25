@@ -3,21 +3,20 @@ pragma solidity 0.8.21;
 pragma abicoder v2;
 
 import {Strings} from "lib/openzeppelin-contracts/contracts/utils/Strings.sol";
-import {Ownable2Step} from "lib/openzeppelin-contracts/contracts/access/Ownable2Step.sol";
+import {Ownable} from "lib/openzeppelin-contracts/contracts/access/Ownable.sol";
 import {ERC2771Context, Context} from "lib/openzeppelin-contracts/contracts/metatx/ERC2771Context.sol";
 import {IWaveFactory} from "../interfaces/IWaveFactory.sol";
 import {IWaveContract} from "../interfaces/IWaveContract.sol";
 import {IRaffleManager} from "../interfaces/IRaffleManager.sol";
 import {ERC721} from "lib/openzeppelin-contracts/contracts/token/ERC721/ERC721.sol";
 import {IERC20} from "lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
-import {SafeERC20} from 'lib/openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol';
+import {SafeERC20} from "lib/openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
 import {ReentrancyGuard} from "lib/openzeppelin-contracts/contracts/security/ReentrancyGuard.sol";
 import {SignatureVerifier} from "../helpers/SignatureVerifier.sol";
 
-
-contract WaveContract is ERC2771Context, Ownable2Step, ERC721, SignatureVerifier, ReentrancyGuard, IWaveContract {
+contract WaveContract is ERC2771Context, Ownable, ERC721, SignatureVerifier, ReentrancyGuard, IWaveContract {
     using SafeERC20 for IERC20;
-    
+
     IWaveFactory public factory;
 
     struct TokenRewardInfo {
@@ -32,6 +31,8 @@ contract WaveContract is ERC2771Context, Ownable2Step, ERC721, SignatureVerifier
     uint256 public deployedTimestamp;
     uint256 public mintsPerClaim = 1;
     uint256 public randomNumber;
+    uint256 public raffleWithdrawableAmount;
+    uint256 public constant TOKEN_LOCK_TIME = 60 * 60 * 24 * 365;
 
     string _metadataBaseURI;
 
@@ -59,7 +60,7 @@ contract WaveContract is ERC2771Context, Ownable2Step, ERC721, SignatureVerifier
 
     event Claimed(address indexed user, uint256 indexed tokenId);
     event FCFSAwarded(address indexed user, address indexed token, uint256 amount);
-    event RaffleWon(address indexed user, address indexed token, uint256 amount);
+    event RaffleWon(uint256 indexed tokenId, address indexed token, uint256 amount);
     event RaffleWithdrawn(address indexed user, address indexed token, uint256 amount);
     event RaffleStarted(address indexed user);
     event RaffleCompleted();
@@ -108,7 +109,7 @@ contract WaveContract is ERC2771Context, Ownable2Step, ERC721, SignatureVerifier
         bool _isSoulbound,
         address _trustedForwarder,
         IWaveFactory.TokenRewards memory _tokenRewards
-    ) ERC2771Context(_trustedForwarder) Ownable2Step() ERC721(_name, _symbol) SignatureVerifier(_name) {
+    ) ERC2771Context(_trustedForwarder) Ownable() ERC721(_name, _symbol) SignatureVerifier(_name) {
         if (_startTimestamp > _endTimestamp || _endTimestamp < block.timestamp) {
             revert InvalidTimings();
         }
@@ -118,7 +119,7 @@ contract WaveContract is ERC2771Context, Ownable2Step, ERC721, SignatureVerifier
 
         if (_startTimestamp < block.timestamp) {
             startTimestamp = block.timestamp;
-        } else { 
+        } else {
             startTimestamp = _startTimestamp;
         }
         endTimestamp = _endTimestamp;
@@ -126,7 +127,9 @@ contract WaveContract is ERC2771Context, Ownable2Step, ERC721, SignatureVerifier
         isSoulbound = _isSoulbound;
         tokenRewards = _tokenRewards;
 
-        if (_tokenRewards.token != address(0)) isERC20Campaign = true;
+        if (_tokenRewards.token != address(0)) {
+            isERC20Campaign = true;
+        }
     }
 
     /// @inheritdoc IWaveContract
@@ -144,8 +147,11 @@ contract WaveContract is ERC2771Context, Ownable2Step, ERC721, SignatureVerifier
     /// @inheritdoc IWaveContract
     function setEndTimestamp(uint256 _endTimestamp) public onlyAuthorized {
         /// @dev the wave should end before the contract deployment + 1 year and after the start timestamp
-        require(_endTimestamp > block.timestamp && _endTimestamp > startTimestamp 
-        && _endTimestamp < deployedTimestamp + 31536000, "Invalid end timestamp");
+        require(
+            _endTimestamp > block.timestamp && _endTimestamp > startTimestamp
+                && _endTimestamp < deployedTimestamp + 31536000,
+            "Invalid end timestamp"
+        );
         endTimestamp = _endTimestamp;
     }
 
@@ -166,14 +172,16 @@ contract WaveContract is ERC2771Context, Ownable2Step, ERC721, SignatureVerifier
     }
 
     /// @inheritdoc IWaveContract
-    function withdrawFunds() public onlyEnded onlyGovernance {
-        if (tokenRewards.isRaffle) {
-            require(
-                !raffleCompleted || _isGovernance(),
-                "Can withdraw raffle funds only if raffle is not completed or governance requested it"
-            );
+    function withdrawFunds() public onlyEnded onlyAuthorized {
+        IERC20 token = IERC20(tokenRewards.token);
+        uint256 amount = token.balanceOf(address(this));
+
+        // after TOKEN_LOCK_TIME, unclaimed tokens become withdrawable by the owner
+        if (tokenRewards.isRaffle && block.timestamp < endTimestamp + TOKEN_LOCK_TIME) {
+            amount = raffleWithdrawableAmount;
         }
-        _returnTokenToOwner(IERC20(tokenRewards.token));
+
+        _returnTokenToOwner(token, amount);
     }
 
     /// @notice allow to disqualify or requalify the `tokenIds` to win raffle rewards
@@ -257,16 +265,21 @@ contract WaveContract is ERC2771Context, Ownable2Step, ERC721, SignatureVerifier
                 if (tokenIdToTokenRewardInfo[tokenId].isDisqualified) continue;
             } while (tokenIdToTokenRewardInfo[tokenId].hasWon);
 
-            emit RaffleWon(ownerOf(tokenId), tokenRewards.token, tokenRewards.amountPerUser);
+            emit RaffleWon(tokenId, tokenRewards.token, tokenRewards.amountPerUser);
             tokenIdToTokenRewardInfo[tokenId].hasWon = true;
         }
+
+        uint256 tokenBalance = IERC20(tokenRewards.token).balanceOf(address(this));
+
+        // if there are leftover tokens from rewards assignment, project can withdraw them
+        raffleWithdrawableAmount = tokenBalance - rewardsToAssign * tokenRewards.amountPerUser;
 
         raffleCompleted = true;
         emit RaffleCompleted();
     }
 
     /// @inheritdoc IWaveContract
-    function withdrawTokenReward(uint256 tokenId) public onlyEnded nonReentrant { 
+    function withdrawTokenReward(uint256 tokenId) public onlyEnded nonReentrant {
         require(isERC20Campaign, "Not an ERC20 campaign");
         require(raffleCompleted, "Raffle not completed yet");
         require(tokenRewards.isRaffle, "Not a raffle wave");
@@ -340,13 +353,11 @@ contract WaveContract is ERC2771Context, Ownable2Step, ERC721, SignatureVerifier
 
     /// @dev internal function to call when withdrawing funds after campaign is ended
     /// @param token the token address of which balance has to be returned to the owner
-    function _returnTokenToOwner(IERC20 token) internal {
-        uint256 balance = token.balanceOf(address(this));
-        if (balance != 0) {
-            token.safeTransfer(owner(), balance);
+    function _returnTokenToOwner(IERC20 token, uint256 amount) internal {
+        if (amount != 0) {
+            token.safeTransfer(owner(), amount);
         }
-
-        emit FundsWithdrawn(address(token), balance);
+        emit FundsWithdrawn(address(token), amount);
     }
 
     function _isGovernance() internal view returns (bool) {

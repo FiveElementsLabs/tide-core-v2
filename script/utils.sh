@@ -6,16 +6,22 @@ source .env && forge create --rpc-url "https://polygon.llamarpc.com" \
   --verify \
   src/core/WaveFactory.sol:WaveFactory
 
+# run deploy pipeline
+source .env && forge script script/DeployPipeline.sol --rpc-url $POLYGON_RPC_URL --verify --etherscan-api-key $POLYGONSCAN_API_KEY --broadcast -vvvv --with-gas-price 1000000 #gas-price in wei
+
+# run deploy pipeline on blockscout networks
+source .env && forge script script/DeployPipeline.sol --rpc-url $SHIMMER_RPC_URL --verify --verifier-url "https://explorer.evm.shimmer.network.api/" --verifier blockscout --broadcast -vvvv --legacy --with-gas-price 1000000 #gas-price in wei
+
 # verify already deployed contract
 source .env && forge verify-contract \
-    --chain-id 137 \
+    --chain-id 8453 \
     --num-of-optimizations 200 \
     --watch \
-    --constructor-args $(cast abi-encode "constructor(string,string,string,uint256,uint256,bool,address,(uint256,uint256,address,bool))" "ERC20 Raffle with factory of Jan 5" "ERW" "https://tideprotocol.infura-ipfs.io/ipfs/Qmdky8829grbjghPzFtL9MPgnT2UyxTbGWb9tTq8V7WJmt" 1704448749 1707177599 false 0x8f5B08237d9aaf212a6ABeF3379149765dEE9C10 "(300,100,0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174,true)") \
-    --etherscan-api-key $POLYGONSCAN_API_KEY \
+    --constructor-args $(cast abi-encode "constructor(address,address)" 0xa0AD79D995DdeeB18a14eAef56A549A04e3Aa1Bd 0xbe8dafe74b545b3638b55c049339eb34c0351d71 ) \
+    --etherscan-api-key $BASESCAN_API_KEY \
     --compiler-version v0.8.21 \
-    0x56F546570905d525fd12909f2722bFf7c6D84E43 \
-    src/core/WaveContract.sol:WaveContract
+    0xd141f8ca10d2c46c5b8bc5b390165b47955dfb98 \
+    src/core/RaffleManager.sol:RaffleManager
 
 #api3 section
 npx @api3/airnode-admin sponsor-requester \
