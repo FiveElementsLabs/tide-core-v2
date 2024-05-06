@@ -35,8 +35,8 @@ contract DeployPipeline is Script {
         address rrpAddress;
         uint256 chainId = getChainID();
 
-        // for chains that do not support random number generation (Shimmer EVM, Mainnet and IOTA EVM) we can skip the rest
-        if (chainId == 148 || chainId == 1 || chainId == 8822) return;
+        // for chains that do not support random number generation (Shimmer EVM, Mainnet, IOTA EVM and HAQQ) we can skip the rest
+        if (chainId == 148 || chainId == 1 || chainId == 8822 || chainId == 11235) return;
 
         if (chainId == 42161) rrpAddress = arbitrumRrp;
         else rrpAddress = airnodeRrp;
