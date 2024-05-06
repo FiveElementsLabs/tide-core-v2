@@ -179,6 +179,7 @@ contract WaveContract is ERC2771Context, Ownable, ERC721, SignatureVerifier, Ree
         // after TOKEN_LOCK_TIME, unclaimed tokens become withdrawable by the owner
         if (tokenRewards.isRaffle && block.timestamp < endTimestamp + TOKEN_LOCK_TIME) {
             amount = raffleWithdrawableAmount;
+            raffleWithdrawableAmount = 0;
         }
 
         _returnTokenToOwner(token, amount);
