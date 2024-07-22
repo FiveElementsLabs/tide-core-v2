@@ -35,8 +35,10 @@ contract DeployPipeline is Script {
         address rrpAddress;
         uint256 chainId = getChainID();
 
-        // for chains that do not support random number generation (Shimmer EVM, Mainnet, IOTA EVM, HAQQ, Humanode, Manta) we can skip the rest
-        if (chainId == 148 || chainId == 1 || chainId == 8822 || chainId == 11235 || chainId == 5234 || chainId == 169)
+        // for chains that do not support random number generation we can skip the rest
+        // (Shimmer EVM, Mainnet, IOTA EVM, HAQQ, Humanode, Manta, Avalanche) 
+        if (chainId == 148 || chainId == 1 || chainId == 8822 || chainId == 11235 
+        || chainId == 5234 || chainId == 169 || chainId == 43114)
         {
             return;
         }

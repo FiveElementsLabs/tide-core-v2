@@ -14,14 +14,15 @@ source .env && forge script script/DeployPipeline.sol --rpc-url $SHIMMER_RPC_URL
 
 # verify already deployed contract
 source .env && forge verify-contract \
-    --chain-id 8453 \
+    --chain-id 8822 \
     --num-of-optimizations 200 \
     --watch \
-    --constructor-args $(cast abi-encode "constructor(address,address)" 0xa0AD79D995DdeeB18a14eAef56A549A04e3Aa1Bd 0xbe8dafe74b545b3638b55c049339eb34c0351d71 ) \
-    --etherscan-api-key $BASESCAN_API_KEY \
+    --constructor-args $(cast abi-encode "constructor(string,string,string,uint256,uint256,bool,address,(uint256,uint256,address,bool))" "Liquidity campaign" "LC" "https://campaigns-metadata.s3.eu-west-1.amazonaws.com/1020d4b8-2132-4ced-b807-85f2a0ca08af" 1718661644 1722383999 false 0xafA1853E44e547F1A9770Fd37c4556b4Faf54674 "(0,0,0x0000000000000000000000000000000000000000,false)") \
     --compiler-version v0.8.21 \
-    0xd141f8ca10d2c46c5b8bc5b390165b47955dfb98 \
-    src/core/RaffleManager.sol:RaffleManager
+    --verifier blockscout \
+    --verifier-url https://explorer.evm.iota.org/api \
+    0x331395A35379bcAfA7612aaDF9a9fb54199a398c \
+    src/core/WaveContract.sol:WaveContract
 
 #api3 section
 npx @api3/airnode-admin sponsor-requester \
